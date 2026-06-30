@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Stitching Card Stencil Generator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Dependencies from CDNs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="csg.js"></script>
+    <style>
+        /* Custom scrollbar styling */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        /* Loader animation */
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #6366f1;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="h-full text-slate-100 flex flex-col overflow-hidden font-sans select-none">
+
+    <!-- Header Navigation Bar -->
+    <header class="bg-slate-950 border-b border-slate-800 px-6 py-3 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
+            <span class="p-2 bg-indigo-600 rounded-lg shadow-md shadow-indigo-900/30">
+                <!-- 3D Cube Icon -->
+                <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+            </span>
+            <div>
+                <h1 class="font-bold text-lg leading-tight text-white">3D Stencil Generator</h1>
+                <p class="text-xs text-slate-400">Embroidery Stencil 3D Model Creator</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <!-- Project Load Button -->
+            <label for="projectLoader" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg cursor-pointer font-semibold shadow-lg shadow-indigo-950/20 transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12"/></svg>
+                Load Project JSON / SVG
+            </label>
+            <input type="file" id="projectLoader" accept=".json,.svg" class="hidden">
+            
+            <a href="stitching_generator.html" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg font-medium border border-slate-700 transition">
+                Back to 2D Editor
+            </a>
+        </div>
+    </header>
+
+    <!-- App Shell Layout -->
+    <div class="flex-1 flex overflow-hidden w-full relative">
+
+        <!-- LOADING OVERLAY -->
+        <div id="loadingOverlay" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center hidden">
+            <div class="spinner mb-4"></div>
+            <p id="loadingText" class="text-sm font-semibold text-slate-350">Generating 3D Mesh...</p>
+        </div>
+
+        <!-- LEFT PANEL: Parameters & Controls -->
+        <aside class="w-80 bg-slate-900 border-r border-slate-800 flex flex-col overflow-y-auto custom-scrollbar shrink-0">
+            
+            <!-- Section: Input Status -->
+            <div class="p-4 border-b border-slate-800">
+                <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">1. Input Details</h3>
+                <div id="noProjectAlert" class="bg-slate-950/60 p-3 rounded-lg border border-slate-800 text-xs text-slate-400 italic">
+                    No file loaded. Please load a stitching project JSON or SVG file to begin.
+                </div>
+                <div id="projectInfo" class="hidden space-y-2 bg-slate-950/60 p-3 rounded-lg border border-slate-800 text-xs">
+                    <div class="flex justify-between"><span class="text-slate-400">Card Size:</span><span id="infoCardSize" class="font-semibold">127 x 178 mm</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Total Holes:</span><span id="infoTotalHoles" class="font-semibold">0</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Path Layers:</span><span id="infoLayersCount" class="font-semibold">0</span></div>
+                </div>
+            </div>
+
+            <!-- Section: 3D Stencil Parameters -->
+            <div class="p-4 border-b border-slate-800 space-y-4">
+                <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-wider">2. Stencil Dimensions</h3>
+                
+                <!-- Plate Thickness -->
+                <div>
+                    <div class="flex justify-between items-center text-xs text-slate-300 mb-1">
+                        <span>Plate Thickness</span>
+                        <div class="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5">
+                            <input type="number" id="numPlateThickness" value="2.0" min="1.0" max="6.0" step="0.1" class="w-10 bg-transparent border-none text-right text-xs text-slate-100 focus:outline-none p-0">
+                            <span class="text-[10px] text-slate-500">mm</span>
+                        </div>
+                    </div>
+                    <input type="range" id="slidePlateThickness" min="1.0" max="6.0" step="0.1" value="2.0" class="w-full accent-indigo-500 bg-slate-750 h-1 rounded-lg cursor-pointer">
+                </div>
+
+                <!-- Preferred Hole Diameter -->
+                <div>
+                    <div class="flex justify-between items-center text-xs text-slate-300 mb-1">
+                        <span class="flex items-center gap-1">
+                            Hole Diameter
+                            <span title="Preferred size from calibration test" class="cursor-help bg-slate-800 text-slate-400 text-[9px] px-1.5 py-0.2 rounded-full font-bold">i</span>
+                        </span>
+                        <div class="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5">
+                            <input type="number" id="numHoleDiameter" value="1.5" min="0.5" max="3.0" step="0.1" class="w-10 bg-transparent border-none text-right text-xs text-slate-100 focus:outline-none p-0">
+                            <span class="text-[10px] text-slate-500">mm</span>
+                        </div>
+                    </div>
+                    <input type="range" id="slideHoleDiameter" min="0.5" max="3.0" step="0.1" value="1.5" class="w-full accent-indigo-500 bg-slate-750 h-1 rounded-lg cursor-pointer">
+                </div>
+
+                <!-- Chamfer Height -->
+                <div>
+                    <div class="flex justify-between items-center text-xs text-slate-300 mb-1">
+                        <span>Chamfer Height (Cone)</span>
+                        <div class="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5">
+                            <input type="number" id="numChamferHeight" value="0.6" min="0.0" max="1.5" step="0.1" class="w-10 bg-transparent border-none text-right text-xs text-slate-100 focus:outline-none p-0">
+                            <span class="text-[10px] text-slate-500">mm</span>
+                        </div>
+                    </div>
+                    <input type="range" id="slideChamferHeight" min="0.0" max="1.5" step="0.1" value="0.6" class="w-full accent-indigo-500 bg-slate-750 h-1 rounded-lg cursor-pointer">
+                </div>
+
+                <!-- Chamfer Extra Width -->
+                <div>
+                    <div class="flex justify-between items-center text-xs text-slate-300 mb-1">
+                        <span>Chamfer Extra Width</span>
+                        <div class="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5">
+                            <input type="number" id="numChamferExtra" value="0.8" min="0.0" max="2.0" step="0.1" class="w-10 bg-transparent border-none text-right text-xs text-slate-100 focus:outline-none p-0">
+                            <span class="text-[10px] text-slate-500">mm</span>
+                        </div>
+                    </div>
+                    <input type="range" id="slideChamferExtra" min="0.0" max="2.0" step="0.1" value="0.8" class="w-full accent-indigo-500 bg-slate-750 h-1 rounded-lg cursor-pointer">
+                </div>
+            </div>
+
+            <!-- Section: Multi-color / Rings Settings -->
+            <div class="p-4 border-b border-slate-800 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-wider">3. Multi-color Rings</h3>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="chkEnableRings" checked class="sr-only peer">
+                        <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-650"></div>
+                    </label>
+                </div>
+
+                <div id="ringsControls" class="space-y-4 transition-all">
+                    <!-- Ring Height -->
+                    <div>
+                        <div class="flex justify-between items-center text-xs text-slate-300 mb-1">
+                            <span>Ring Height (Pockets)</span>
+                            <div class="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5">
+                                <input type="number" id="numRingHeight" value="0.6" min="0.2" max="2.0" step="0.1" class="w-10 bg-transparent border-none text-right text-xs text-slate-100 focus:outline-none p-0">
+                                <span class="text-[10px] text-slate-500">mm</span>
+                            </div>
+                        </div>
+                        <input type="range" id="slideRingHeight" min="0.2" max="2.0" step="0.1" value="0.6" class="w-full accent-indigo-500 bg-slate-750 h-1 rounded-lg cursor-pointer">
+                    </div>
+
+                    <!-- Ring Width -->
+                    <div>
+                        <div class="flex justify-between items-center text-xs text-slate-300 mb-1">
+                            <span>Ring Width (Border)</span>
+                            <div class="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5">
+                                <input type="number" id="numRingWidth" value="1.0" min="0.4" max="3.0" step="0.1" class="w-10 bg-transparent border-none text-right text-xs text-slate-100 focus:outline-none p-0">
+                                <span class="text-[10px] text-slate-500">mm</span>
+                            </div>
+                        </div>
+                        <input type="range" id="slideRingWidth" min="0.4" max="3.0" step="0.1" value="1.0" class="w-full accent-indigo-500 bg-slate-750 h-1 rounded-lg cursor-pointer">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section: Path Groove Lines (Colored) -->
+            <div class="p-4 border-b border-slate-800 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-wider">4. Colored Path Lines</h3>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="chkEnableGrooves" checked class="sr-only peer">
+                        <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-650"></div>
+                    </label>
+                </div>
+                <p class="text-[10px] text-slate-500 leading-tight -mt-2">Raised lines between holes, the same color as that path's border rings.</p>
+
+                <div id="groovesControls" class="space-y-4 transition-all">
+                    <!-- Groove Height -->
+                    <div>
+                        <div class="flex justify-between items-center text-xs text-slate-300 mb-1">
+                            <span>Line Height</span>
+                            <div class="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5">
+                                <input type="number" id="numGrooveDepth" value="0.4" min="0.1" max="1.5" step="0.1" class="w-10 bg-transparent border-none text-right text-xs text-slate-100 focus:outline-none p-0">
+                                <span class="text-[10px] text-slate-500">mm</span>
+                            </div>
+                        </div>
+                        <input type="range" id="slideGrooveDepth" min="0.1" max="1.5" step="0.1" value="0.4" class="w-full accent-indigo-500 bg-slate-750 h-1 rounded-lg cursor-pointer">
+                    </div>
+
+                    <!-- Groove Width -->
+                    <div>
+                        <div class="flex justify-between items-center text-xs text-slate-300 mb-1">
+                            <span>Line Width</span>
+                            <div class="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5">
+                                <input type="number" id="numGrooveWidth" value="0.6" min="0.2" max="2.0" step="0.1" class="w-10 bg-transparent border-none text-right text-xs text-slate-100 focus:outline-none p-0">
+                                <span class="text-[10px] text-slate-500">mm</span>
+                            </div>
+                        </div>
+                        <input type="range" id="slideGrooveWidth" min="0.2" max="2.0" step="0.1" value="0.6" class="w-full accent-indigo-500 bg-slate-750 h-1 rounded-lg cursor-pointer">
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- CENTRAL AREA: 3D Preview Canvas -->
+        <main class="flex-1 flex flex-col bg-slate-950 relative overflow-hidden">
+            <!-- Contextual Tool / Preview Mode Selection Bar -->
+            <div class="bg-slate-900 border-b border-slate-800 px-4 py-2 flex items-center justify-between shadow-inner shrink-0 z-10">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-semibold text-slate-400">Preview Mode:</span>
+                    <div class="inline-flex rounded-md shadow-sm" role="group">
+                        <button id="btnPrevMulti" class="px-3 py-1.5 text-xs font-semibold rounded-l-md bg-indigo-600 text-white border border-indigo-550 transition">
+                            Multi-Color
+                        </button>
+                        <button id="btnPrevSingle" class="px-3 py-1.5 text-xs font-semibold rounded-r-md bg-slate-800 text-slate-400 border border-slate-700 hover:text-white transition">
+                            Single-Color
+                        </button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button id="btnResetView" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-2.5 py-1.5 rounded transition flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 15H18" /></svg>
+                        Reset Camera
+                    </button>
+                </div>
+            </div>
+
+            <!-- Preview Viewport -->
+            <div id="viewportContainer" class="flex-1 w-full h-full relative overflow-hidden bg-slate-950">
+                <div id="canvasPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 text-sm italic select-none">
+                    <svg class="w-12 h-12 text-slate-650 mb-3 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                    Load a project file to generate the 3D stencil preview.
+                </div>
+            </div>
+
+            <!-- Footer Stats bar -->
+            <footer class="bg-slate-900 border-t border-slate-800 px-6 py-2 flex items-center justify-between text-xs text-slate-400 shrink-0 z-10">
+                <div class="flex items-center gap-6">
+                    <div>
+                        <span class="text-slate-500">Dimensions:</span> <strong class="text-slate-250" id="statDims">0 x 0 mm</strong>
+                    </div>
+                    <div>
+                        <span class="text-slate-500">CSG Execution:</span> <strong class="text-slate-250" id="statTime">0 ms</strong>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="statusIndicator" class="w-2.5 h-2.5 rounded-full bg-slate-600"></span>
+                    <span id="statusText">No Project Loaded</span>
+                </div>
+            </footer>
+        </main>
+
+        <!-- RIGHT PANEL: Path Layers & Exporters -->
+        <aside class="w-80 bg-slate-900 border-l border-slate-800 flex flex-col overflow-y-auto custom-scrollbar shrink-0">
+            <!-- Part 1: Layers list -->
+            <div class="p-4 border-b border-slate-800 flex-1 flex flex-col min-h-[250px]">
+                <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-3">5. Path Layers (Stitch Groups)</h3>
+                
+                <div id="noLayersAlert" class="text-xs text-slate-500 italic py-6 text-center">
+                    Import a JSON file to inspect layers.
+                </div>
+                
+                <div id="pathLayersList" class="space-y-2 flex-1 overflow-y-auto custom-scrollbar pr-1">
+                    <!-- Dynamic Layer items loaded from JSON -->
+                </div>
+            </div>
+
+            <!-- Part 2: Export Center Card -->
+            <div class="p-4 bg-slate-950/40 border-t border-slate-800 space-y-3 shrink-0">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">6. Export 3D Stencil Files</h3>
+                
+                <div class="space-y-2" id="exportButtonGroup">
+                    <button id="btnExport3MF" disabled class="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg font-bold shadow-lg text-sm transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        Export Multi-Color 3MF
+                    </button>
+                    
+                    <button id="btnExportSTL" disabled class="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-750 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-slate-200 border border-slate-750 py-2 rounded-lg font-semibold text-xs transition">
+                        Export Single-Color STL
+                    </button>
+
+                    <button id="btnExportSTLsZip" disabled class="w-full flex items-center justify-center gap-2 bg-slate-850 hover:bg-slate-750 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-slate-350 border border-slate-800 py-2 rounded-lg font-medium text-xs transition">
+                        Export Multi-Color STLs (ZIP)
+                    </button>
+                </div>
+                <p class="text-[10px] text-slate-500 text-center leading-tight">
+                    * The 3MF export preserves colored rings and alignments for printers like Bambu AMS.
+                </p>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- MAIN GENERATOR LOGIC AND CSG PIPELINE -->
+    <script>
+        // DOM Handles
+        const projectLoader = document.getElementById('projectLoader');
+        const noProjectAlert = document.getElementById('noProjectAlert');
+        const projectInfo = document.getElementById('projectInfo');
+        const infoCardSize = document.getElementById('infoCardSize');
+        const infoTotalHoles = document.getElementById('infoTotalHoles');
+        const infoLayersCount = document.getElementById('infoLayersCount');
+        const pathLayersList = document.getElementById('pathLayersList');
+        const noLayersAlert = document.getElementById('noLayersAlert');
+        
+        // Settings elements
+        const slidePlateThickness = document.getElementById('slidePlateThickness');
+        const numPlateThickness = document.getElementById('numPlateThickness');
+        const slideHoleDiameter = document.getElementById('slideHoleDiameter');
+        const numHoleDiameter = document.getElementById('numHoleDiameter');
+        const slideChamferHeight = document.getElementById('slideChamferHeight');
+        const numChamferHeight = document.getElementById('numChamferHeight');
+        const slideChamferExtra = document.getElementById('slideChamferExtra');
+        const numChamferExtra = document.getElementById('numChamferExtra');
+        const chkEnableRings = document.getElementById('chkEnableRings');
+        const ringsControls = document.getElementById('ringsControls');
+        const slideRingHeight = document.getElementById('slideRingHeight');
+        const numRingHeight = document.getElementById('numRingHeight');
+        const slideRingWidth = document.getElementById('slideRingWidth');
+        const numRingWidth = document.getElementById('numRingWidth');
+        const chkEnableGrooves = document.getElementById('chkEnableGrooves');
+        const groovesControls = document.getElementById('groovesControls');
+        const slideGrooveDepth = document.getElementById('slideGrooveDepth');
+        const numGrooveDepth = document.getElementById('numGrooveDepth');
+        const slideGrooveWidth = document.getElementById('slideGrooveWidth');
+        const numGrooveWidth = document.getElementById('numGrooveWidth');
+
+        // View Mode selectors
+        const btnPrevMulti = document.getElementById('btnPrevMulti');
+        const btnPrevSingle = document.getElementById('btnPrevSingle');
+        const btnResetView = document.getElementById('btnResetView');
+        const canvasPlaceholder = document.getElementById('canvasPlaceholder');
+        const viewportContainer = document.getElementById('viewportContainer');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+
+        // Exporters
+        const btnExport3MF = document.getElementById('btnExport3MF');
+        const btnExportSTL = document.getElementById('btnExportSTL');
+        const btnExportSTLsZip = document.getElementById('btnExportSTLsZip');
+
+        // Stats Footer
+        const statDims = document.getElementById('statDims');
+        const statTime = document.getElementById('statTime');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+
+        // App States
+        let projectLoadedData = null; // Storing the imported project structure
+        let previewMode = 'multi';    // 'multi' or 'single'
+        let cardWidth = 127;
+        let cardHeight = 177.8;
+        let originalHoleDiameter = 1.2;
+        let activePaths = [];
+
+        // CSG caching
+        let generatedBasePlateCsg = null;
+        let generatedPathRingsCsgs = []; // Array of { name, color, csg }
+        let singleColorStencilCsg = null;
+
+        // Three.js States
+        let scene, camera, renderer, controls;
+        let meshGroup = new THREE.Group();
+
+        // 3D Scene setup
+        function init3D() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x020617); // bg-slate-950
+
+            camera = new THREE.PerspectiveCamera(45, viewportContainer.clientWidth / viewportContainer.clientHeight, 1, 1000);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(viewportContainer.clientWidth, viewportContainer.clientHeight);
+            renderer.shadowMap.enabled = true;
+            
+            canvasPlaceholder.classList.add('hidden');
+            viewportContainer.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Lights
+            var ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+
+            var dirLight1 = new THREE.DirectionalLight(0xffffff, 0.7);
+            dirLight1.position.set(100, 200, 100);
+            scene.add(dirLight1);
+
+            var dirLight2 = new THREE.DirectionalLight(0xa5b4fc, 0.3); // indigo-200 tint
+            dirLight2.position.set(-100, -200, -50);
+            scene.add(dirLight2);
+
+            scene.add(meshGroup);
+
+            // Resize listener
+            window.addEventListener('resize', onWindowResize);
+            
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (controls) controls.update();
+            if (renderer && scene && camera) renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            if (!renderer) return;
+            camera.aspect = viewportContainer.clientWidth / viewportContainer.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(viewportContainer.clientWidth, viewportContainer.clientHeight);
+        }
+
+        function resetCamera() {
+            if (!camera || !controls) return;
+            camera.position.set(cardWidth / 2, cardHeight / 2 - cardHeight * 1.0, 200);
+            controls.target.set(cardWidth / 2, cardHeight / 2, 0);
+            controls.update();
+        }
+
+        // Attach CSG.cone extension to CSG
+        CSG.cone = function(options) {
+            options = options || {};
+            var s = new CSG.Vector(options.start || [0, -1, 0]);
+            var e = new CSG.Vector(options.end || [0, 1, 0]);
+            var ray = e.minus(s);
+            var rStart = options.radiusStart !== undefined ? options.radiusStart : (options.radius || 1);
+            var rEnd = options.radiusEnd !== undefined ? options.radiusEnd : (options.radius || 1);
+            var slices = options.slices || 16;
+            
+            var axisZ = ray.unit(), isY = (Math.abs(axisZ.y) > 0.5);
+            var axisX = new CSG.Vector(isY, !isY, 0).cross(axisZ).unit();
+            var axisY = axisX.cross(axisZ).unit();
+            var start = new THREE.Vector3(s.x, s.y, s.z); // using three vector for math sometimes or CSG directly
+            
+            var startVertex = new CSG.Vertex(s, axisZ.negated());
+            var endVertex = new CSG.Vertex(e, axisZ.unit());
+            var polygons = [];
+            
+            function point(stack, slice, normalBlend) {
+                var angle = slice * Math.PI * 2;
+                var out = axisX.times(Math.cos(angle)).plus(axisY.times(Math.sin(angle)));
+                var r = rStart + (rEnd - rStart) * stack;
+                var pos = s.plus(ray.times(stack)).plus(out.times(r));
+                var normal = out.times(1 - Math.abs(normalBlend)).plus(axisZ.times(normalBlend));
+                return new CSG.Vertex(pos, normal);
+            }
+            
+            for (var i = 0; i < slices; i++) {
+                var t0 = i / slices, t1 = (i + 1) / slices;
+                polygons.push(new CSG.Polygon([startVertex, point(0, t0, -1), point(0, t1, -1)]));
+                polygons.push(new CSG.Polygon([point(0, t1, 0), point(0, t0, 0), point(1, t0, 0), point(1, t1, 0)]));
+                polygons.push(new CSG.Polygon([endVertex, point(1, t1, 1), point(1, t0, 1)]));
+            }
+            return CSG.fromPolygons(polygons);
+        };
+
+        // UI Event Listeners and Sync
+        function syncSliderWithInput(slider, input, updateFn) {
+            slider.addEventListener('input', (e) => {
+                input.value = e.target.value;
+                updateFn();
+            });
+            input.addEventListener('change', (e) => {
+                let val = parseFloat(e.target.value);
+                let min = parseFloat(e.target.min);
+                let max = parseFloat(e.target.max);
+                if (isNaN(val)) val = parseFloat(slider.value);
+                val = Math.max(min, Math.min(max, val));
+                e.target.value = val;
+                slider.value = val;
+                updateFn();
+            });
+        }
+
+        // Toggles
+        chkEnableRings.addEventListener('change', () => {
+            if (chkEnableRings.checked) {
+                ringsControls.classList.remove('opacity-50', 'pointer-events-none');
+            } else {
+                ringsControls.classList.add('opacity-50', 'pointer-events-none');
+            }
+            scheduleGeneration();
+        });
+
+        chkEnableGrooves.addEventListener('change', () => {
+            if (chkEnableGrooves.checked) {
+                groovesControls.classList.remove('opacity-50', 'pointer-events-none');
+            } else {
+                groovesControls.classList.add('opacity-50', 'pointer-events-none');
+            }
+            scheduleGeneration();
+        });
+
+        // Set up all sliders syncing
+        syncSliderWithInput(slidePlateThickness, numPlateThickness, scheduleGeneration);
+        syncSliderWithInput(slideHoleDiameter, numHoleDiameter, scheduleGeneration);
+        syncSliderWithInput(slideChamferHeight, numChamferHeight, scheduleGeneration);
+        syncSliderWithInput(slideChamferExtra, numChamferExtra, scheduleGeneration);
+        syncSliderWithInput(slideRingHeight, numRingHeight, scheduleGeneration);
+        syncSliderWithInput(slideRingWidth, numRingWidth, scheduleGeneration);
+        syncSliderWithInput(slideGrooveDepth, numGrooveDepth, scheduleGeneration);
+        syncSliderWithInput(slideGrooveWidth, numGrooveWidth, scheduleGeneration);
+
+        // Preview Toggles
+        btnPrevMulti.addEventListener('click', () => {
+            if (previewMode === 'multi') return;
+            previewMode = 'multi';
+            btnPrevMulti.className = 'px-3 py-1.5 text-xs font-semibold rounded-l-md bg-indigo-600 text-white border border-indigo-550 transition';
+            btnPrevSingle.className = 'px-3 py-1.5 text-xs font-semibold rounded-r-md bg-slate-800 text-slate-400 border border-slate-700 hover:text-white transition';
+            renderPreviewMesh();
+        });
+
+        btnPrevSingle.addEventListener('click', () => {
+            if (previewMode === 'single') return;
+            previewMode = 'single';
+            btnPrevSingle.className = 'px-3 py-1.5 text-xs font-semibold rounded-r-md bg-indigo-600 text-white border border-indigo-550 transition';
+            btnPrevMulti.className = 'px-3 py-1.5 text-xs font-semibold rounded-l-md bg-slate-800 text-slate-400 border border-slate-700 hover:text-white transition';
+            renderPreviewMesh();
+        });
+
+        btnResetView.addEventListener('click', resetCamera);
+
+        // File loader handling
+        projectLoader.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const filename = file.name.toLowerCase();
+                if (filename.endsWith('.json')) {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        parseJSONProject(data);
+                    } catch (err) {
+                        alert("Failed to parse stitching project JSON file.");
+                    }
+                } else if (filename.endsWith('.svg')) {
+                    parseSVGProject(event.target.result);
+                }
+            };
+            
+            if (file.name.toLowerCase().endsWith('.json')) {
+                reader.readAsText(file);
+            } else if (file.name.toLowerCase().endsWith('.svg')) {
+                reader.readAsText(file);
+            }
+        });
+
+        // Parser for JSON Stitching Project
+        function parseJSONProject(data) {
+            projectLoadedData = data;
+            cardWidth = data.cardWidthMm || 127;
+            cardHeight = data.cardHeightMm || 177.8;
+            originalHoleDiameter = data.holeDiameter || 1.2;
+
+            // Update parameters in UI
+            slideHoleDiameter.value = originalHoleDiameter;
+            numHoleDiameter.value = originalHoleDiameter;
+
+            activePaths = (data.paths || []).map((path, idx) => {
+                return {
+                    id: path.id || 'path-' + idx,
+                    name: path.name || `Path ${idx + 1}`,
+                    points: path.points || [],
+                    closed: path.closed || false,
+                    visible: path.visible !== undefined ? path.visible : true,
+                    color: path.color || '#4f46e5',
+                    enabled: true // Stencil specific enable/disable
+                };
+            });
+
+            // Set up scene if first load
+            if (!scene) init3D();
+
+            updateProjectInfo();
+            renderLayersUI();
+            scheduleGeneration();
+        }
+
+        // Parser for SVG fallback
+        function parseSVGProject(svgText) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(svgText, "image/svg+xml");
+            
+            // Extract dimensions
+            let svgW = 127;
+            let svgH = 177.8;
+            const svgNode = doc.querySelector('svg');
+            if (svgNode) {
+                const viewbox = svgNode.getAttribute('viewBox');
+                if (viewbox) {
+                    const parts = viewbox.split(/\s+/).map(parseFloat);
+                    if (parts.length === 4) {
+                        svgW = parts[2];
+                        svgH = parts[3];
+                    }
+                } else {
+                    const w = parseFloat(svgNode.getAttribute('width'));
+                    const h = parseFloat(svgNode.getAttribute('height'));
+                    if (!isNaN(w) && !isNaN(h)) {
+                        svgW = w;
+                        svgH = h;
+                    }
+                }
+            }
+
+            cardWidth = svgW;
+            cardHeight = svgH;
+            originalHoleDiameter = 1.2;
+
+            // Extract circles as points
+            const circleNodes = doc.querySelectorAll('circle');
+            const points = [];
+            circleNodes.forEach(node => {
+                const cx = parseFloat(node.getAttribute('cx'));
+                const cy = parseFloat(node.getAttribute('cy'));
+                const r = parseFloat(node.getAttribute('r')) || 0.6;
+                originalHoleDiameter = r * 2;
+                if (!isNaN(cx) && !isNaN(cy)) {
+                    points.push({ x: cx, y: cy });
+                }
+            });
+
+            // Extract paths for grooves
+            const pathNodes = doc.querySelectorAll('path');
+            const parsedPaths = [];
+            pathNodes.forEach((node, idx) => {
+                const d = node.getAttribute('d');
+                if (!d) return;
+                // Simple parsing for M and L commands
+                const pathPoints = [];
+                const commands = d.split(/[,\s]+/);
+                for (let i = 0; i < commands.length; i++) {
+                    const cmd = commands[i].toUpperCase();
+                    if (cmd === 'M' || cmd === 'L') {
+                        const px = parseFloat(commands[i+1]);
+                        const py = parseFloat(commands[i+2]);
+                        if (!isNaN(px) && !isNaN(py)) {
+                            pathPoints.push({ x: px, y: py });
+                        }
+                        i += 2;
+                    }
+                }
+                if (pathPoints.length > 0) {
+                    const closed = d.toUpperCase().includes('Z');
+                    parsedPaths.push({
+                        id: 'svg-path-' + idx,
+                        name: `SVG Path ${idx + 1}`,
+                        points: pathPoints,
+                        closed: closed,
+                        color: '#4f46e5',
+                        enabled: true
+                    });
+                }
+            });
+
+            // If we found flat circles but no paths, create a dummy path layer for holes
+            if (parsedPaths.length === 0 && points.length > 0) {
+                parsedPaths.push({
+                    id: 'svg-holes-path',
+                    name: 'All Holes',
+                    points: points,
+                    closed: false,
+                    color: '#4f46e5',
+                    enabled: true
+                });
+            }
+
+            projectLoadedData = {
+                cardWidthMm: cardWidth,
+                cardHeightMm: cardHeight,
+                holeDiameter: originalHoleDiameter,
+                paths: parsedPaths
+            };
+
+            slideHoleDiameter.value = originalHoleDiameter;
+            numHoleDiameter.value = originalHoleDiameter;
+
+            activePaths = parsedPaths;
+
+            if (!scene) init3D();
+
+            updateProjectInfo();
+            renderLayersUI();
+            scheduleGeneration();
+        }
+
+        // Info Display Sync
+        function updateProjectInfo() {
+            noProjectAlert.classList.add('hidden');
+            projectInfo.classList.remove('hidden');
+            
+            infoCardSize.textContent = `${cardWidth} x ${cardHeight} mm`;
+            
+            let total = 0;
+            activePaths.forEach(p => {
+                if (p.enabled) total += p.points.length;
+            });
+            infoTotalHoles.textContent = total;
+            infoLayersCount.textContent = activePaths.length;
+            
+            statDims.textContent = `${cardWidth} x ${cardHeight} mm`;
+            
+            // Enable exports
+            btnExport3MF.removeAttribute('disabled');
+            btnExportSTL.removeAttribute('disabled');
+            btnExportSTLsZip.removeAttribute('disabled');
+            
+            statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse";
+            statusText.textContent = "Stencil Ready";
+        }
+
+        // Layers Sidebar UI
+        function renderLayersUI() {
+            pathLayersList.innerHTML = '';
+            noLayersAlert.classList.add('hidden');
+
+            activePaths.forEach((path, idx) => {
+                const item = document.createElement('div');
+                item.className = `p-3 rounded-lg border text-xs flex items-center justify-between transition bg-slate-850 hover:bg-slate-800 border-slate-750 text-slate-350`;
+
+                const leftBlock = document.createElement('div');
+                leftBlock.className = 'flex items-center gap-2 truncate';
+
+                const colorDot = document.createElement('span');
+                colorDot.className = 'w-3 h-3 rounded-full shrink-0 border border-slate-700';
+                colorDot.style.backgroundColor = path.color;
+                leftBlock.appendChild(colorDot);
+
+                const textBlock = document.createElement('div');
+                textBlock.className = 'truncate';
+                const nameLabel = document.createElement('p');
+                nameLabel.className = 'font-semibold text-slate-100 truncate';
+                nameLabel.textContent = path.name;
+                const statsLabel = document.createElement('p');
+                statsLabel.className = 'text-[10px] text-slate-500';
+                statsLabel.textContent = `${path.points.length} holes • ${path.closed ? 'Closed' : 'Open'}`;
+                
+                textBlock.appendChild(nameLabel);
+                textBlock.appendChild(statsLabel);
+                leftBlock.appendChild(textBlock);
+                item.appendChild(leftBlock);
+
+                // Checkbox to toggle inclusion
+                const toggle = document.createElement('input');
+                toggle.type = 'checkbox';
+                toggle.checked = path.enabled;
+                toggle.className = 'rounded border-slate-700 text-indigo-650 bg-slate-900 focus:ring-0 cursor-pointer h-4 w-4';
+                toggle.addEventListener('change', () => {
+                    path.enabled = toggle.checked;
+                    updateProjectInfo();
+                    scheduleGeneration();
+                });
+                item.appendChild(toggle);
+
+                pathLayersList.appendChild(item);
+            });
+
+            if (activePaths.length === 0) {
+                noLayersAlert.classList.remove('hidden');
+            }
+        }
+
+        // Generation Scheduling (prevent freezing on fast slider moves)
+        let generationTimeout = null;
+        function scheduleGeneration() {
+            if (!projectLoadedData) return;
+            
+            if (generationTimeout) clearTimeout(generationTimeout);
+            
+            loadingOverlay.classList.remove('hidden');
+            loadingText.textContent = "Updating parameters...";
+            
+            generationTimeout = setTimeout(generate3DStencil, 350);
+        }
+
+        // --- Core 3D Geometry Generation Pipeline ---
+        function generate3DStencil() {
+            if (!projectLoadedData) return;
+            
+            const startExecutionTime = performance.now();
+            loadingText.textContent = "Running CSG boolean operations...";
+
+            // Retrieve parameters
+            const plateT = parseFloat(numPlateThickness.value);
+            const holeD = parseFloat(numHoleDiameter.value);
+            const holeR = holeD / 2;
+            const chamferH = parseFloat(numChamferHeight.value);
+            const chamferE = parseFloat(numChamferExtra.value);
+            
+            const ringsEnabled = chkEnableRings.checked;
+            const ringH = parseFloat(numRingHeight.value);
+            const ringW = parseFloat(numRingWidth.value);
+            const ringR = holeR + ringW;
+
+            const groovesEnabled = chkEnableGrooves.checked;
+            const grooveD = parseFloat(numGrooveDepth.value);
+            const grooveW = parseFloat(numGrooveWidth.value);
+
+            // 1. Define base solid box plate
+            const basePlate = CSG.cube({
+                center: [cardWidth / 2, cardHeight / 2, plateT / 2],
+                radius: [cardWidth / 2, cardHeight / 2, plateT / 2]
+            });
+
+            // 2. Gather polygons for fast disjoint union
+            const throughHolePolygons = [];
+            const pocketPolygons = [];
+            const chamferPolygons = [];
+            const groovePolygons = [];
+
+            // Tracking path rings groups
+            const pathRingsObjects = [];
+
+            activePaths.forEach(path => {
+                if (!path.enabled || path.points.length === 0) return;
+
+                const pathOuterPolys = [];
+                const pathInnerPolys = [];
+                const pathChamferPolys = [];
+                const pathGrooveSolidPolys = []; // Raised colored groove solids (same color as rings)
+
+                path.points.forEach(pt => {
+                    const x = pt.x;
+                    const y = cardHeight - pt.y; // invert Y coordinate to match visual layout
+
+                    // Through-hole geometry
+                    const thCyl = CSG.cylinder({
+                        start: [x, y, -0.5],
+                        end: [x, y, plateT + 0.5],
+                        radius: holeR,
+                        slices: 20
+                    });
+                    throughHolePolygons.push(...thCyl.toPolygons());
+                    pathInnerPolys.push(...CSG.cylinder({
+                        start: [x, y, -0.5],
+                        end: [x, y, ringH + 0.5],
+                        radius: holeR,
+                        slices: 20
+                    }).toPolygons());
+
+                    // Chamfer geometry (bottom cone frustum)
+                    if (chamferH > 0) {
+                        const chamfCone = CSG.cone({
+                            start: [x, y, -0.1], // slight offset for precision
+                            end: [x, y, chamferH],
+                            radiusStart: holeR + (chamferE / 2),
+                            radiusEnd: holeR,
+                            slices: 20
+                        });
+                        chamferPolygons.push(...chamfCone.toPolygons());
+                        pathChamferPolys.push(...CSG.cone({
+                            start: [x, y, -0.1],
+                            end: [x, y, Math.min(chamferH, ringH)],
+                            radiusStart: holeR + (chamferE / 2),
+                            radiusEnd: holeR + (chamferE / 2) * (1 - Math.min(chamferH, ringH)/chamferH),
+                            slices: 20
+                        }).toPolygons());
+                    }
+
+                    // Pockets (for multi-color)
+                    if (ringsEnabled) {
+                        const pockCyl = CSG.cylinder({
+                            start: [x, y, -0.5],
+                            end: [x, y, ringH],
+                            radius: ringR,
+                            slices: 20
+                        });
+                        pocketPolygons.push(...pockCyl.toPolygons());
+                        pathOuterPolys.push(...CSG.cylinder({
+                            start: [x, y, 0],
+                            end: [x, y, ringH],
+                            radius: ringR,
+                            slices: 20
+                        }).toPolygons());
+                    }
+                });
+
+                // Grooves (connecting lines along path)
+                if (groovesEnabled && path.points.length >= 2) {
+                    for (let i = 0; i < path.points.length - 1; i++) {
+                        addGrooveSegment(path.points[i], path.points[i+1]);
+                    }
+                    if (path.closed) {
+                        addGrooveSegment(path.points[path.points.length - 1], path.points[0]);
+                    }
+                }
+
+                function addGrooveSegment(p1, p2) {
+                    const x1 = p1.x;
+                    const y1 = cardHeight - p1.y;
+                    const x2 = p2.x;
+                    const y2 = cardHeight - p2.y;
+
+                    const dx = x2 - x1;
+                    const dy = y2 - y1;
+                    const len = Math.hypot(dx, dy);
+                    if (len < 0.01) return;
+
+                    const theta = Math.atan2(dy, dx);
+                    const cos = Math.cos(theta);
+                    const sin = Math.sin(theta);
+                    const mx = (x1 + x2) / 2;
+                    const my = (y1 + y2) / 2;
+
+                    // Helper: rotate and translate a CSG box's polygons
+                    function transformPolys(csgBox) {
+                        return csgBox.toPolygons().map(poly => {
+                            return new CSG.Polygon(poly.vertices.map(vertex => {
+                                var vx = vertex.pos.x;
+                                var vy = vertex.pos.y;
+                                var rx = vx * cos - vy * sin + mx;
+                                var ry = vx * sin + vy * cos + my;
+                                return new CSG.Vertex(
+                                    new CSG.Vector(rx, ry, vertex.pos.z),
+                                    new CSG.Vector(
+                                        vertex.normal.x * cos - vertex.normal.y * sin,
+                                        vertex.normal.x * sin + vertex.normal.y * cos,
+                                        vertex.normal.z
+                                    )
+                                );
+                            }), poly.shared);
+                        });
+                    }
+
+                    // Groove VOID box (slightly over-sized in Z to cleanly cut the plate)
+                    var grooveVoidBox = CSG.cube({
+                        center: [0, 0, (grooveD - 0.1) / 2],
+                        radius: [len / 2, grooveW / 2, (grooveD + 0.1) / 2]
+                    });
+                    groovePolygons.push(...transformPolys(grooveVoidBox));
+
+                    // Groove SOLID box (sits from Z=0 to Z=grooveD, same color as path rings)
+                    var grooveSolidBox = CSG.cube({
+                        center: [0, 0, grooveD / 2],
+                        radius: [len / 2, grooveW / 2, grooveD / 2]
+                    });
+                    pathGrooveSolidPolys.push(...transformPolys(grooveSolidBox));
+                }
+
+                // Build ring annulus solid for this path
+                var pathColoredSolid = null;
+                if (ringsEnabled && pathOuterPolys.length > 0) {
+                    var outerSolid = CSG.fromPolygons(pathOuterPolys);
+                    var innerSolid = CSG.fromPolygons(pathInnerPolys);
+                    var pathRings = outerSolid.subtract(innerSolid);
+                    if (pathChamferPolys.length > 0) {
+                        pathRings = pathRings.subtract(CSG.fromPolygons(pathChamferPolys));
+                    }
+                    pathColoredSolid = pathRings;
+                }
+
+                // Build raised groove solid and union it with the rings (same path color)
+                // Note: hole/chamfer subtraction happens in a global pass after all paths are processed
+                // so that cross-path holes are also cleared from every groove line.
+                if (groovesEnabled && pathGrooveSolidPolys.length > 0) {
+                    var grooveSolid = CSG.fromPolygons(pathGrooveSolidPolys);
+                    pathColoredSolid = pathColoredSolid
+                        ? pathColoredSolid.union(grooveSolid)
+                        : grooveSolid;
+                }
+
+                // Add combined rings + groove lines as one colored object per path
+                if (pathColoredSolid) {
+                    pathRingsObjects.push({
+                        name: path.name,
+                        color: path.color,
+                        csg: pathColoredSolid
+                    });
+                }
+            });
+
+            // 3. Compile all disjoint polygons to unified CSG objects
+            const mergedHoles = CSG.fromPolygons(throughHolePolygons);
+            const mergedChamfers = CSG.fromPolygons(chamferPolygons);
+            const mergedPockets = CSG.fromPolygons(pocketPolygons);
+            const mergedGrooves = CSG.fromPolygons(groovePolygons);
+
+            // 4. Global hole/chamfer pass: subtract ALL holes (and chamfers) from every colored
+            // path object (rings + groove lines). This ensures cross-path groove/hole intersections
+            // are cleared even when a groove from path A crosses a hole that belongs to path B.
+            if (throughHolePolygons.length > 0) {
+                for (var pri = 0; pri < pathRingsObjects.length; pri++) {
+                    pathRingsObjects[pri].csg = pathRingsObjects[pri].csg.subtract(mergedHoles);
+                    if (chamferH > 0 && chamferPolygons.length > 0) {
+                        pathRingsObjects[pri].csg = pathRingsObjects[pri].csg.subtract(mergedChamfers);
+                    }
+                }
+            }
+
+            // 5. Run subtract operations on the base plates
+            // Multi-color plate (has pockets cut out)
+            var multiPlate = basePlate.subtract(mergedHoles).subtract(mergedPockets).subtract(mergedChamfers);
+            if (groovePolygons.length > 0) {
+                multiPlate = multiPlate.subtract(mergedGrooves);
+            }
+
+            // Single-color plate (no pockets)
+            var singlePlate = basePlate.subtract(mergedHoles).subtract(mergedChamfers);
+            if (groovePolygons.length > 0) {
+                singlePlate = singlePlate.subtract(mergedGrooves);
+            }
+
+            // Cache generated solids
+            generatedBasePlateCsg = multiPlate;
+            generatedPathRingsCsgs = pathRingsObjects;
+            singleColorStencilCsg = singlePlate;
+
+            const endExecutionTime = performance.now();
+            statTime.textContent = `${Math.round(endExecutionTime - startExecutionTime)} ms`;
+
+            loadingOverlay.classList.add('hidden');
+
+            // Render in Three.js Scene
+            renderPreviewMesh();
+            
+            // Adjust camera to fit stencil on first load
+            if (meshGroup.children.length === 0 || camera.position.length() === 0) {
+                resetCamera();
+            }
+        }
+
+        // Convert CSG to THREE.BufferGeometry
+        function csgToThreeGeometry(csg) {
+            const polygons = csg.toPolygons();
+            const positions = [];
+            const normals = [];
+            
+            for (let i = 0; i < polygons.length; i++) {
+                const poly = polygons[i];
+                const verts = poly.vertices;
+                if (verts.length < 3) continue;
+                
+                // Fan triangulation
+                for (let j = 1; j < verts.length - 1; j++) {
+                    positions.push(verts[0].pos.x, verts[0].pos.y, verts[0].pos.z);
+                    normals.push(poly.plane.normal.x, poly.plane.normal.y, poly.plane.normal.z);
+                    
+                    positions.push(verts[j].pos.x, verts[j].pos.y, verts[j].pos.z);
+                    normals.push(poly.plane.normal.x, poly.plane.normal.y, poly.plane.normal.z);
+                    
+                    positions.push(verts[j+1].pos.x, verts[j+1].pos.y, verts[j+1].pos.z);
+                    normals.push(poly.plane.normal.x, poly.plane.normal.y, poly.plane.normal.z);
+                }
+            }
+            
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+            return geometry;
+        }
+
+        // Render Geometry in Preview
+        function renderPreviewMesh() {
+            if (!scene) return;
+
+            // Clear previous meshes
+            while (meshGroup.children.length > 0) {
+                const m = meshGroup.children[0];
+                meshGroup.remove(m);
+                if (m.geometry) m.geometry.dispose();
+                if (m.material) {
+                    if (Array.isArray(m.material)) m.material.forEach(mat => mat.dispose());
+                    else m.material.dispose();
+                }
+            }
+
+            if (previewMode === 'single') {
+                // Render flat single color plate
+                if (!singleColorStencilCsg) return;
+                const geom = csgToThreeGeometry(singleColorStencilCsg);
+                const mat = new THREE.MeshStandardMaterial({
+                    color: 0x334155, // slate-700
+                    roughness: 0.6,
+                    metalness: 0.1,
+                    side: THREE.DoubleSide
+                });
+                const mesh = new THREE.Mesh(geom, mat);
+                meshGroup.add(mesh);
+            } else {
+                // Render multi-color plate
+                if (!generatedBasePlateCsg) return;
+
+                // Base Plate mesh
+                const geomBase = csgToThreeGeometry(generatedBasePlateCsg);
+                const matBase = new THREE.MeshStandardMaterial({
+                    color: 0x1e293b, // slate-800
+                    roughness: 0.7,
+                    metalness: 0.1,
+                    side: THREE.DoubleSide
+                });
+                const meshBase = new THREE.Mesh(geomBase, matBase);
+                meshGroup.add(meshBase);
+
+                // Rings meshes
+                generatedPathRingsCsgs.forEach(pr => {
+                    const geomRings = csgToThreeGeometry(pr.csg);
+                    const matRings = new THREE.MeshStandardMaterial({
+                        color: new THREE.Color(pr.color),
+                        roughness: 0.5,
+                        metalness: 0.1,
+                        side: THREE.DoubleSide
+                    });
+                    const meshRings = new THREE.Mesh(geomRings, matRings);
+                    meshGroup.add(meshRings);
+                });
+            }
+        }
+
+        // --- Exporters Logic ---
+
+        // Convert CSG to Binary STL ArrayBuffer
+        function csgToBinarySTL(csg) {
+            const polygons = csg.toPolygons();
+            const triangles = [];
+            
+            for (let i = 0; i < polygons.length; i++) {
+                const poly = polygons[i];
+                const verts = poly.vertices;
+                if (verts.length < 3) continue;
+                
+                for (let j = 1; j < verts.length - 1; j++) {
+                    triangles.push({
+                        normal: poly.plane.normal,
+                        v1: verts[0].pos,
+                        v2: verts[j].pos,
+                        v3: verts[j+1].pos
+                    });
+                }
+            }
+            
+            const buffer = new ArrayBuffer(84 + triangles.length * 50);
+            const view = new DataView(buffer);
+            
+            // Header (80 bytes empty)
+            for (let i = 0; i < 80; i++) view.setUint8(i, 0);
+            
+            // Triangle count
+            view.setUint32(80, triangles.length, true);
+            
+            let offset = 84;
+            for (let i = 0; i < triangles.length; i++) {
+                const tri = triangles[i];
+                
+                // Normal
+                view.setFloat32(offset, tri.normal.x, true);
+                view.setFloat32(offset + 4, tri.normal.y, true);
+                view.setFloat32(offset + 8, tri.normal.z, true);
+                
+                // Vertex 1
+                view.setFloat32(offset + 12, tri.v1.x, true);
+                view.setFloat32(offset + 16, tri.v1.y, true);
+                view.setFloat32(offset + 20, tri.v1.z, true);
+                
+                // Vertex 2
+                view.setFloat32(offset + 24, tri.v2.x, true);
+                view.setFloat32(offset + 28, tri.v2.y, true);
+                view.setFloat32(offset + 32, tri.v2.z, true);
+                
+                // Vertex 3
+                view.setFloat32(offset + 36, tri.v3.x, true);
+                view.setFloat32(offset + 40, tri.v3.y, true);
+                view.setFloat32(offset + 44, tri.v3.z, true);
+                
+                // Attribute byte count
+                view.setUint16(offset + 48, 0, true);
+                
+                offset += 50;
+            }
+            return buffer;
+        }
+
+        // Convert CSG to 3MF Mesh XML definition
+        function csgTo3MFMeshXML(csg, id, name, pid, pindex) {
+            const polygons = csg.toPolygons();
+            const vertices = [];
+            const vertexMap = {};
+            const triangles = [];
+            
+            for (let i = 0; i < polygons.length; i++) {
+                const poly = polygons[i];
+                const verts = poly.vertices;
+                if (verts.length < 3) continue;
+                
+                const indices = [];
+                for (let j = 0; j < verts.length; j++) {
+                    const p = verts[j].pos;
+                    const key = p.x.toFixed(4) + "," + p.y.toFixed(4) + "," + p.z.toFixed(4);
+                    if (vertexMap[key] === undefined) {
+                        vertexMap[key] = vertices.length;
+                        vertices.push(p);
+                    }
+                    indices.push(vertexMap[key]);
+                }
+                
+                for (let j = 1; j < indices.length - 1; j++) {
+                    triangles.push([indices[0], indices[j], indices[j+1]]);
+                }
+            }
+            
+            let xml = `    <object id="${id}" type="model" name="${name.replace(/"/g, '&quot;')}">\n`;
+            xml += `      <mesh>\n`;
+            xml += `        <vertices>\n`;
+            for (let i = 0; i < vertices.length; i++) {
+                const v = vertices[i];
+                xml += `          <vertex x="${v.x.toFixed(4)}" y="${v.y.toFixed(4)}" z="${v.z.toFixed(4)}" />\n`;
+            }
+            xml += `        </vertices>\n`;
+            xml += `        <triangles>\n`;
+            for (let i = 0; i < triangles.length; i++) {
+                const t = triangles[i];
+                xml += `          <triangle v1="${t[0]}" v2="${t[1]}" v3="${t[2]}" pid="${pid}" pindex="${pindex}" />\n`;
+            }
+            xml += `        </triangles>\n`;
+            xml += `      </mesh>\n`;
+            xml += `    </object>\n`;
+            
+            return xml;
+        }
+
+        // Generate full 3MF XML (3D/3dmodel.model)
+        function generate3MFModelXML(basePlateCsg, pathRings) {
+            let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+            xml += `<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">\n`;
+            xml += `  <resources>\n`;
+            
+            // Define colors
+            xml += `    <basematerials id="1">\n`;
+            xml += `      <base name="BasePlate" displaycolor="#2B2B2B" />\n`;
+            for (let i = 0; i < pathRings.length; i++) {
+                xml += `      <base name="${pathRings[i].name.replace(/"/g, '&quot;')}" displaycolor="${pathRings[i].color.toUpperCase()}" />\n`;
+            }
+            xml += `    </basematerials>\n`;
+            
+            let nextId = 2;
+            const buildIds = [];
+            
+            // 1. Add base plate
+            xml += csgTo3MFMeshXML(basePlateCsg, nextId, "Base Plate", 1, 0);
+            buildIds.push(nextId);
+            nextId++;
+            
+            // 2. Add path rings
+            for (let i = 0; i < pathRings.length; i++) {
+                xml += csgTo3MFMeshXML(pathRings[i].csg, nextId, pathRings[i].name + " Rings", 1, i + 1);
+                buildIds.push(nextId);
+                nextId++;
+            }
+            
+            xml += `  </resources>\n`;
+            xml += `  <build>\n`;
+            for (let i = 0; i < buildIds.length; i++) {
+                xml += `    <item objectid="${buildIds[i]}" />\n`;
+            }
+            xml += `  </build>\n`;
+            xml += `</model>`;
+            
+            return xml;
+        }
+
+        // Helper to trigger file download
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Export 3MF file trigger
+        btnExport3MF.addEventListener('click', () => {
+            if (!generatedBasePlateCsg) return;
+
+            loadingOverlay.classList.remove('hidden');
+            loadingText.textContent = "Packaging 3MF model ZIP archive...";
+
+            setTimeout(() => {
+                try {
+                    const zip = new JSZip();
+                    
+                    // 1. [Content_Types].xml
+                    const contentTypes = `<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>
+</Types>`;
+                    zip.file("[Content_Types].xml", contentTypes);
+                    
+                    // 2. _rels/.rels
+                    const rels = `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel" Target="/3D/3dmodel.model"/>
+</Relationships>`;
+                    zip.folder("_rels").file(".rels", rels);
+                    
+                    // 3. 3D/3dmodel.model
+                    const modelXml = generate3MFModelXML(generatedBasePlateCsg, generatedPathRingsCsgs);
+                    zip.folder("3D").file("3dmodel.model", modelXml);
+                    
+                    // Generate ZIP file
+                    zip.generateAsync({ type: "blob" }).then(content => {
+                        downloadBlob(content, "stitching_stencil_multicolor.3mf");
+                        loadingOverlay.classList.add('hidden');
+                    });
+                } catch (err) {
+                    alert("Error exporting 3MF file.");
+                    loadingOverlay.classList.add('hidden');
+                }
+            }, 100);
+        });
+
+        // Export Single-Color STL trigger
+        btnExportSTL.addEventListener('click', () => {
+            if (!singleColorStencilCsg) return;
+
+            loadingOverlay.classList.remove('hidden');
+            loadingText.textContent = "Generating single-color binary STL...";
+
+            setTimeout(() => {
+                try {
+                    const stlBuffer = csgToBinarySTL(singleColorStencilCsg);
+                    const blob = new Blob([stlBuffer], { type: "application/octet-stream" });
+                    downloadBlob(blob, "stitching_stencil_single_color.stl");
+                    loadingOverlay.classList.add('hidden');
+                } catch (err) {
+                    alert("Error exporting STL file.");
+                    loadingOverlay.classList.add('hidden');
+                }
+            }, 100);
+        });
+
+        // Export STLs ZIP trigger (separate files)
+        btnExportSTLsZip.addEventListener('click', () => {
+            if (!generatedBasePlateCsg) return;
+
+            loadingOverlay.classList.remove('hidden');
+            loadingText.textContent = "Compiling individual STL files into ZIP...";
+
+            setTimeout(() => {
+                try {
+                    const zip = new JSZip();
+                    
+                    // Add base plate STL (which has pockets)
+                    const basePlateStl = csgToBinarySTL(generatedBasePlateCsg);
+                    zip.file("base_plate_pock.stl", basePlateStl);
+                    
+                    // Add each path rings STL
+                    generatedPathRingsCsgs.forEach(pr => {
+                        const ringsStl = csgToBinarySTL(pr.csg);
+                        const safeName = pr.name.replace(/\s+/g, "_").toLowerCase();
+                        zip.file(`rings_${safeName}.stl`, ringsStl);
+                    });
+                    
+                    zip.generateAsync({ type: "blob" }).then(content => {
+                        downloadBlob(content, "stitching_stencil_separate_stls.zip");
+                        loadingOverlay.classList.add('hidden');
+                    });
+                } catch (err) {
+                    alert("Error exporting ZIP of STLs.");
+                    loadingOverlay.classList.add('hidden');
+                }
+            }, 100);
+        });
+
+    </script>
+</body>
+</html>

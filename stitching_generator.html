@@ -1,0 +1,2069 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Stitching Pattern Blueprint Studio</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar styling for sidebar panels */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        /* Canvas container custom styling */
+        .canvas-viewport {
+            background-image: radial-gradient(#334155 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="h-full text-slate-100 flex flex-col overflow-hidden font-sans select-none">
+
+    <!-- Header Navigation Bar -->
+    <header class="bg-slate-950 border-b border-slate-800 px-6 py-3 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
+            <span class="p-2 bg-indigo-600 rounded-lg shadow-md shadow-indigo-900/30">
+                <!-- Needle/Stitch Icon SVG -->
+                <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+            </span>
+            <div>
+                <h1 class="font-bold text-lg leading-tight text-white">Stitching Pattern Studio</h1>
+                <p class="text-xs text-slate-400">Grandma's Embroidery Blueprint Generator</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <!-- Project Save/Load -->
+            <label for="projectLoader" class="text-xs bg-slate-850 hover:bg-slate-750 text-slate-200 px-3 py-2 rounded-lg cursor-pointer font-medium border border-slate-700 transition">
+                Load Project JSON
+            </label>
+            <input type="file" id="projectLoader" accept=".json" class="hidden">
+            
+            <button id="saveProjectBtn" class="text-xs bg-slate-850 hover:bg-slate-750 text-slate-200 px-3 py-2 rounded-lg font-medium border border-slate-700 transition">
+                Save Project JSON
+            </button>
+
+            <span class="h-6 w-[1px] bg-slate-800 mx-1"></span>
+
+            <!-- Master Export SVG -->
+            <button id="downloadBtn" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-semibold shadow-lg shadow-emerald-950/20 text-sm transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Export SVG Blueprint
+            </button>
+
+            <a href="stencil_generator.html" target="_blank" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-semibold shadow-lg shadow-indigo-950/20 text-sm transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                Generate 3D Stencil
+            </a>
+        </div>
+    </header>
+
+    <!-- App Shell Layout -->
+    <div class="flex-1 flex overflow-hidden w-full">
+
+        <!-- LEFT PANEL: Paper Setup & Backdrop Correction -->
+        <aside class="w-80 bg-slate-900 border-r border-slate-800 flex flex-col overflow-y-auto custom-scrollbar shrink-0">
+            <!-- Section: Document Boundaries -->
+            <div class="p-4 border-b border-slate-800">
+                <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-3">1. Workspace / Card Settings</h3>
+                
+                <div class="space-y-3">
+                    <!-- Unit Selection Toggle -->
+                    <div class="flex items-center justify-between bg-slate-950/60 p-1.5 rounded-lg border border-slate-800 mb-2">
+                        <span class="text-xs font-medium text-slate-400 pl-1">Unit System</span>
+                        <div class="inline-flex rounded-md shadow-sm" role="group">
+                            <button type="button" id="unitMmBtn" class="px-2.5 py-1 text-xs font-semibold rounded-l-md bg-indigo-600 text-white border border-indigo-550 transition">
+                                mm
+                            </button>
+                            <button type="button" id="unitInBtn" class="px-2.5 py-1 text-xs font-semibold rounded-r-md bg-slate-800 text-slate-400 border border-slate-700 hover:text-white transition">
+                                inch
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Standard Preset Size</label>
+                        <select id="cardPreset" class="w-full bg-slate-800 border border-slate-700 text-slate-100 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                            <option value="A7" selected>A7 Greeting Card (5" x 7" / 127 x 178 mm)</option>
+                            <option value="A2">A2 Note Card (4.25" x 5.5" / 108 x 140 mm)</option>
+                            <option value="A6">A6 Standard Card (4.13" x 5.83" / 105 x 148 mm)</option>
+                            <option value="Square">Square Card (5" x 5" / 127 x 127 mm)</option>
+                            <option value="Letter">US Letter (8.5" x 11" / 216 x 279 mm)</option>
+                            <option value="A4">A4 Sheet (8.27" x 11.69" / 210 x 297 mm)</option>
+                            <option value="Custom">Custom Size</option>
+                        </select>
+                    </div>
+
+                    <!-- Custom inputs, visible or toggled -->
+                    <div id="customSizeRow" class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-medium text-slate-400 mb-0.5" id="lblWidthTitle">Width (mm)</label>
+                            <input type="number" id="cardWidth" value="127" step="0.5" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-medium text-slate-400 mb-0.5" id="lblHeightTitle">Height (mm)</label>
+                            <input type="number" id="cardHeight" value="177.8" step="0.5" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1" id="lblHoleSizeTitle">Hole Size (mm)</label>
+                            <input type="number" id="holeSize" value="1.2" step="0.1" class="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1" id="lblGridSpacingTitle">Grid Spacing (mm)</label>
+                            <input type="number" id="gridSpacing" value="5.0" step="0.5" class="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-4 mt-2">
+                        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                            <input type="checkbox" id="showGridCheck" checked class="rounded border-slate-750 text-indigo-600 focus:ring-0 focus:ring-offset-0 bg-slate-800">
+                            Show Grid Lines
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                            <input type="checkbox" id="snapGridCheck" checked class="rounded border-slate-750 text-indigo-600 focus:ring-0 focus:ring-offset-0 bg-slate-800">
+                            Snap to Grid
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section: Photo Backdrop Alignment -->
+            <div class="p-4 border-b border-slate-800">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-wider">2. Background Photo Alignment</h3>
+                    <span id="imageStatusBadge" class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">No image</span>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- Custom upload button -->
+                    <div>
+                        <label for="imageLoader" class="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-slate-700 rounded-lg cursor-pointer bg-slate-800 hover:bg-slate-750 hover:border-slate-600 transition">
+                            <div class="flex flex-col items-center justify-center pt-4 pb-4">
+                                <svg class="w-6 h-6 text-slate-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                <p class="text-xs text-slate-300"><span class="font-semibold">Upload backdrop photo</span></p>
+                                <p class="text-[9px] text-slate-500 mt-0.5">PNG, JPG, or WebP</p>
+                            </div>
+                            <input type="file" id="imageLoader" accept="image/*" class="hidden">
+                        </label>
+                    </div>
+
+                    <!-- Layout adjustments: scale, rotation, contrast, etc -->
+                    <div id="backdropControls" class="space-y-3 opacity-50 pointer-events-none transition-all">
+                        <!-- Direct fitting utilities -->
+                        <div class="grid grid-cols-2 gap-1.5">
+                            <button id="btnFitWidth" class="text-[10px] bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 py-1 rounded">
+                                Fit Width
+                            </button>
+                            <button id="btnCenterPhoto" class="text-[10px] bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 py-1 rounded">
+                                Center Photo
+                            </button>
+                        </div>
+
+                        <!-- Scale dual inputs -->
+                        <div>
+                            <div class="flex justify-between items-center text-[11px] text-slate-400 mb-1">
+                                <span>Scale Size</span>
+                                <div class="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5">
+                                    <input type="number" id="numBgScale" value="100" min="10" max="400" step="1" class="w-10 bg-transparent border-none text-right text-xs text-slate-100 focus:outline-none p-0">
+                                    <span class="text-[10px] text-slate-550">%</span>
+                                </div>
+                            </div>
+                            <input type="range" id="bgScale" min="10" max="400" value="100" class="w-full accent-indigo-500 bg-slate-750 h-1 rounded-lg cursor-pointer">
+                        </div>
+
+                        <!-- Rotation dual inputs -->
+                        <div>
+                            <div class="flex justify-between items-center text-[11px] text-slate-400 mb-1">
+                                <span>Rotate Angle</span>
+                                <div class="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5">
+                                    <input type="number" id="numBgRotate" value="0" min="-180" max="180" step="1" class="w-10 bg-transparent border-none text-right text-xs text-slate-100 focus:outline-none p-0">
+                                    <span class="text-[10px] text-slate-550">°</span>
+                                </div>
+                            </div>
+                            <input type="range" id="bgRotate" min="-180" max="180" value="0" class="w-full accent-indigo-500 bg-slate-750 h-1 rounded-lg cursor-pointer">
+                        </div>
+
+                        <!-- X offset dual inputs -->
+                        <div>
+                            <div class="flex justify-between items-center text-[11px] text-slate-400 mb-1">
+                                <span>Horizontal Offset (X)</span>
+                                <div class="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5">
+                                    <input type="number" id="numBgX" value="0" step="0.5" class="w-12 bg-transparent border-none text-right text-xs text-slate-100 focus:outline-none p-0">
+                                    <span id="lblBgXUnit" class="text-[10px] text-slate-555">mm</span>
+                                </div>
+                            </div>
+                            <input type="range" id="bgX" min="-150" max="150" value="0" step="0.5" class="w-full accent-indigo-500 bg-slate-750 h-1 rounded-lg cursor-pointer">
+                        </div>
+
+                        <!-- Y offset dual inputs -->
+                        <div>
+                            <div class="flex justify-between items-center text-[11px] text-slate-400 mb-1">
+                                <span>Vertical Offset (Y)</span>
+                                <div class="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5">
+                                    <input type="number" id="numBgY" value="0" step="0.5" class="w-12 bg-transparent border-none text-right text-xs text-slate-100 focus:outline-none p-0">
+                                    <span id="lblBgYUnit" class="text-[10px] text-slate-555">mm</span>
+                                </div>
+                            </div>
+                            <input type="range" id="bgY" min="-150" max="150" value="0" step="0.5" class="w-full accent-indigo-500 bg-slate-750 h-1 rounded-lg cursor-pointer">
+                        </div>
+
+                        <!-- Opacity Slider -->
+                        <div>
+                            <div class="flex justify-between items-center text-[11px] text-slate-400 mb-1">
+                                <span>Transparency / Opacity</span>
+                                <div class="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5">
+                                    <input type="number" id="numBgOpacity" value="50" min="5" max="100" step="1" class="w-10 bg-transparent border-none text-right text-xs text-slate-100 focus:outline-none p-0">
+                                    <span class="text-[10px] text-slate-555">%</span>
+                                </div>
+                            </div>
+                            <input type="range" id="bgOpacity" min="5" max="100" value="50" class="w-full accent-indigo-500 bg-slate-750 h-1 rounded-lg cursor-pointer">
+                        </div>
+
+                        <!-- Brightness Slider -->
+                        <div>
+                            <div class="flex justify-between items-center text-[11px] text-slate-400 mb-1">
+                                <span>Brightness</span>
+                                <div class="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5">
+                                    <input type="number" id="numBgBrightness" value="100" min="30" max="250" step="1" class="w-10 bg-transparent border-none text-right text-xs text-slate-100 focus:outline-none p-0">
+                                    <span class="text-[10px] text-slate-555">%</span>
+                                </div>
+                            </div>
+                            <input type="range" id="bgBrightness" min="30" max="250" value="100" class="w-full accent-indigo-500 bg-slate-750 h-1 rounded-lg cursor-pointer">
+                        </div>
+
+                        <!-- Contrast Slider -->
+                        <div>
+                            <div class="flex justify-between items-center text-[11px] text-slate-400 mb-1">
+                                <span>Contrast</span>
+                                <div class="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5">
+                                    <input type="number" id="numBgContrast" value="100" min="30" max="250" step="1" class="w-10 bg-transparent border-none text-right text-xs text-slate-100 focus:outline-none p-0">
+                                    <span class="text-[10px] text-slate-555">%</span>
+                                </div>
+                            </div>
+                            <input type="range" id="bgContrast" min="30" max="250" value="100" class="w-full accent-indigo-500 bg-slate-750 h-1 rounded-lg cursor-pointer">
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- CENTRAL AREA: Canvas workspace, navigation toolbar, and action bars -->
+        <main class="flex-1 flex flex-col bg-slate-950 relative overflow-hidden">
+            
+            <!-- Contextual Tool Selection Bar -->
+            <div class="bg-slate-900 border-b border-slate-800 px-4 py-2 flex items-center justify-between shadow-inner shrink-0">
+                <!-- Modes Toolbar -->
+                <div class="flex items-center gap-1.5" id="canvasToolbar">
+                    <button id="toolDraw" data-tool="draw" class="flex items-center gap-1.5 bg-indigo-600 text-white border border-indigo-500 rounded-lg px-3.5 py-1.5 text-xs font-semibold shadow-md shadow-indigo-900/20 hover:bg-indigo-500 transition">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        Draw Stitch (Add)
+                    </button>
+
+                    <button id="toolEdit" data-tool="edit" class="flex items-center gap-1.5 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-750 rounded-lg px-3.5 py-1.5 text-xs font-medium transition">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" /></svg>
+                        Adjust / Move Holes
+                    </button>
+
+                    <button id="toolInterpolate" data-tool="interpolate" class="flex items-center gap-1.5 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-750 rounded-lg px-3.5 py-1.5 text-xs font-medium transition">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7v12m0 0l-4-4m4 4l4-4M16 17V5m0 0l-4 4m4-4l4 4" /></svg>
+                        Straight Stitch Line
+                    </button>
+                </div>
+
+                <!-- Live Pointer Position / Zoom Status -->
+                <div class="flex items-center gap-4 text-[11px] text-slate-400 font-mono">
+                    <div class="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded border border-slate-800">
+                        <span class="text-indigo-400">POS:</span>
+                        <span id="lblCursorCoords">0.0, 0.0 mm</span>
+                    </div>
+
+                    <div class="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded border border-slate-800">
+                        <span class="text-indigo-400">ZOOM:</span>
+                        <span id="lblZoomLevel">100%</span>
+                    </div>
+
+                    <!-- Canvas Reset Viewport -->
+                    <button id="btnResetView" title="Reset center view" class="bg-slate-800 hover:bg-slate-700 hover:text-white border border-slate-700 p-1.5 rounded transition">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 15H18" /></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Intermediary notification toast banner -->
+            <div id="toastNotification" class="absolute top-16 left-1/2 -translate-x-1/2 z-20 bg-slate-900 border border-slate-750 text-slate-200 text-xs py-2 px-4 rounded-full shadow-2xl flex items-center gap-2 max-w-sm transition-all duration-300 translate-y-[-100px] opacity-0 pointer-events-none">
+                <span id="toastColorIndicator" class="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0"></span>
+                <span id="toastText">Stitching Path Studio Initialized</span>
+            </div>
+
+            <!-- Main Canvas Viewport Area -->
+            <div class="flex-1 w-full h-full relative overflow-hidden canvas-viewport" id="viewportContainer">
+                <canvas id="studioCanvas" class="absolute block shadow-2xl bg-white select-none touch-none"></canvas>
+
+                <!-- Floating Canvas Controls -->
+                <div class="absolute bottom-4 left-4 z-10 flex flex-col gap-2 bg-slate-900/95 border border-slate-800 p-2.5 rounded-lg shadow-xl backdrop-blur">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Canvas Viewport Controls</p>
+                    <div class="flex items-center gap-2">
+                        <button id="btnZoomOut" class="w-7 h-7 flex items-center justify-center bg-slate-800 hover:bg-slate-750 rounded text-slate-300 font-bold text-base transition">-</button>
+                        <input type="range" id="zoomSlider" min="20" max="600" value="100" class="w-24 accent-indigo-500 bg-slate-750 h-1 rounded cursor-pointer">
+                        <button id="btnZoomIn" class="w-7 h-7 flex items-center justify-center bg-slate-800 hover:bg-slate-750 rounded text-slate-300 font-bold text-base transition">+</button>
+                    </div>
+                </div>
+
+                <!-- Active Drawing / Interpolator Guide Alert box overlay -->
+                <div id="guidelineHelper" class="absolute top-4 right-4 z-10 bg-slate-900/90 border border-indigo-950 p-3 rounded-lg shadow-xl max-w-xs text-xs text-slate-300 pointer-events-none backdrop-blur-sm">
+                    <p class="font-bold text-indigo-400 mb-1">Stitching Tips</p>
+                    <p id="helperText" class="leading-relaxed text-slate-400">Click sequential spots to place punching marks. Hover near the initial green dot to close loops.</p>
+                </div>
+            </div>
+
+            <!-- Footer Stats bar -->
+            <footer class="bg-slate-900 border-t border-slate-800 px-6 py-2 flex items-center justify-between text-xs text-slate-400 shrink-0 select-none">
+                <div class="flex items-center gap-6">
+                    <div>
+                        <span class="text-slate-500">Stitches (Total):</span> <strong class="text-slate-200" id="statHolesCount">0</strong>
+                    </div>
+                    <div>
+                        <span class="text-slate-500">Total Path Length:</span> <strong class="text-slate-200" id="statPathLen">0 mm</strong>
+                    </div>
+                    <div>
+                        <span class="text-slate-500">Estimated Thread Req:</span> <strong class="text-indigo-300" id="statThreadEstimate">~0 cm</strong>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Ready</span>
+                </div>
+            </footer>
+        </main>
+
+        <!-- RIGHT PANEL: Stitch Layer Manager & Precise Coordinate Inspector -->
+        <aside class="w-80 bg-slate-900 border-l border-slate-800 flex flex-col overflow-y-auto custom-scrollbar shrink-0">
+            <!-- Part 1: Layers / Path Manager -->
+            <div class="p-4 border-b border-slate-800 flex-1 flex flex-col min-h-[300px]">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-wider">3. Stitch Paths / Layers</h3>
+                    <button id="btnNewPath" class="text-[11px] bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-2 py-1 rounded transition flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                        New Layer
+                    </button>
+                </div>
+
+                <!-- Path list render block -->
+                <div id="pathLayersList" class="space-y-2 flex-1 overflow-y-auto custom-scrollbar pr-1">
+                    <!-- JavaScript injected lists -->
+                </div>
+            </div>
+
+            <!-- Part 2: Selected Point Inspector -->
+            <div class="p-4 border-b border-slate-800 bg-slate-950/40">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Stitch Inspector (Selected Point)</h3>
+                
+                <div id="noPointSelectedAlert" class="text-xs text-slate-500 py-3 text-center italic">
+                    Select a punch hole in Adjust mode to inspect coordinate settings.
+                </div>
+
+                <div id="pointInspectorGroup" class="hidden space-y-3">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] text-slate-400 mb-0.5" id="inspectorPtXLabel">X coordinate (mm)</label>
+                            <input type="number" id="inspectorPtX" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-400 mb-0.5" id="inspectorPtYLabel">Y coordinate (mm)</label>
+                            <input type="number" id="inspectorPtY" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center gap-2 pt-1">
+                        <span class="text-[10px] text-slate-400" id="lblSelectedPointIndex">Index: #1</span>
+                        <button id="btnDeleteSelectedPoint" class="text-[10px] text-rose-400 hover:text-rose-300 bg-rose-950/30 hover:bg-rose-950/60 px-2 py-1 rounded border border-rose-900 transition">
+                            Delete Hole
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Part 3: Straight Stitch Line Interpolator Config panel -->
+            <div id="interpolatorConfigPanel" class="hidden p-4 border-b border-slate-800 bg-indigo-950/20 border-t border-t-indigo-950">
+                <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-indigo-500"></span> Line Generator Parameters
+                </h3>
+                
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between text-[11px] text-slate-400">
+                        <span>Holes Count (Spacing Segment)</span>
+                        <span id="lblInterpolateCount" class="font-bold text-indigo-300">8 holes</span>
+                    </div>
+                    <input type="range" id="interpolateCount" min="2" max="50" value="8" class="w-full accent-indigo-500 bg-slate-750 h-1 rounded cursor-pointer">
+                    
+                    <div class="flex items-center justify-between text-[11px] text-slate-400">
+                        <span>Interpolation Mode</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <button id="btnInterpLinear" class="text-[10px] bg-indigo-600 text-white font-medium py-1.5 rounded transition">Straight Line</button>
+                        <button id="btnInterpCurved" class="text-[10px] bg-slate-800 hover:bg-slate-755 text-slate-400 py-1.5 rounded transition">Symmetric Curve</button>
+                    </div>
+
+                    <p class="text-[10px] text-slate-400 italic mt-1 leading-tight">
+                        Click A to start, then Click B to end. Adjust sliders to perfectly distribute holes.
+                    </p>
+
+                    <div class="flex gap-2 pt-1">
+                        <button id="btnConfirmInterpolate" class="flex-1 text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1.5 rounded transition shadow-lg shadow-emerald-950/20">Apply Line</button>
+                        <button id="btnCancelInterpolate" class="flex-1 text-[11px] bg-slate-800 hover:bg-slate-755 text-slate-300 py-1.5 rounded transition">Clear Path</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Part 4: Blueprint Global Layers Export toggles -->
+            <div class="p-4 bg-slate-950/20">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Blueprint Print / Export Setup</h3>
+                <div class="space-y-2">
+                    <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                        <input type="checkbox" id="chkExportBoundary" checked class="rounded border-slate-700 text-indigo-600 bg-slate-800 focus:ring-0">
+                        Include Outer Blue Border (Cutting Card)
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                        <input type="checkbox" id="chkExportLines" checked class="rounded border-slate-700 text-indigo-600 bg-slate-800 focus:ring-0">
+                        Include Black Dashed Sewing Trails
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                        <input type="checkbox" id="chkExportHoles" checked class="rounded border-slate-700 text-indigo-600 bg-slate-800 focus:ring-0">
+                        Include Red Vector Circle Guides (Laser/Plotter)
+                    </label>
+                    <div class="pt-2 border-t border-slate-800 mt-2 flex items-center justify-between">
+                        <button id="undoBtn" class="text-[10px] bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 hover:text-white px-2.5 py-1.5 rounded transition">Undo Last (Ctrl+Z)</button>
+                        <button id="clearBtn" class="text-[10px] bg-rose-950/40 hover:bg-rose-950/60 border border-rose-900/60 text-rose-300 px-2.5 py-1.5 rounded transition">Clear Layer</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- MAIN CONTROL SCRIPTS AND LOGIC -->
+    <script>
+        // DOM Handles
+        const canvas = document.getElementById('studioCanvas');
+        const ctx = canvas.getContext('2d');
+        const imageLoader = document.getElementById('imageLoader');
+        const projectLoader = document.getElementById('projectLoader');
+        const saveProjectBtn = document.getElementById('saveProjectBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const undoBtn = document.getElementById('undoBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const holeSizeInput = document.getElementById('holeSize');
+        const gridSpacingInput = document.getElementById('gridSpacing');
+        const showGridCheck = document.getElementById('showGridCheck');
+        const snapGridCheck = document.getElementById('snapGridCheck');
+        const cardPreset = document.getElementById('cardPreset');
+        const cardWidthInput = document.getElementById('cardWidth');
+        const cardHeightInput = document.getElementById('cardHeight');
+        const customSizeRow = document.getElementById('customSizeRow');
+        
+        // Background Controls (Sliders)
+        const bgScaleInput = document.getElementById('bgScale');
+        const bgRotateInput = document.getElementById('bgRotate');
+        const bgXInput = document.getElementById('bgX');
+        const bgYInput = document.getElementById('bgY');
+        const bgOpacityInput = document.getElementById('bgOpacity');
+        const bgBrightnessInput = document.getElementById('bgBrightness');
+        const bgContrastInput = document.getElementById('bgContrast');
+        const btnFitWidth = document.getElementById('btnFitWidth');
+        const btnCenterPhoto = document.getElementById('btnCenterPhoto');
+        const backdropControls = document.getElementById('backdropControls');
+        const imageStatusBadge = document.getElementById('imageStatusBadge');
+
+        // Background Controls (Manual Inputs)
+        const numBgScale = document.getElementById('numBgScale');
+        const numBgRotate = document.getElementById('numBgRotate');
+        const numBgX = document.getElementById('numBgX');
+        const numBgY = document.getElementById('numBgY');
+        const numBgOpacity = document.getElementById('numBgOpacity');
+        const numBgBrightness = document.getElementById('numBgBrightness');
+        const numBgContrast = document.getElementById('numBgContrast');
+        const lblBgXUnit = document.getElementById('lblBgXUnit');
+        const lblBgYUnit = document.getElementById('lblBgYUnit');
+
+        // Unit System Controls
+        const unitMmBtn = document.getElementById('unitMmBtn');
+        const unitInBtn = document.getElementById('unitInBtn');
+
+        // Toolbar / Modes UI
+        const canvasToolbar = document.getElementById('canvasToolbar');
+        const toolDraw = document.getElementById('toolDraw');
+        const toolEdit = document.getElementById('toolEdit');
+        const toolInterpolate = document.getElementById('toolInterpolate');
+        const lblCursorCoords = document.getElementById('lblCursorCoords');
+        const lblZoomLevel = document.getElementById('lblZoomLevel');
+        const btnResetView = document.getElementById('btnResetView');
+        const viewportContainer = document.getElementById('viewportContainer');
+        const helperText = document.getElementById('helperText');
+
+        // Zoom Elements
+        const btnZoomOut = document.getElementById('btnZoomOut');
+        const btnZoomIn = document.getElementById('btnZoomIn');
+        const zoomSlider = document.getElementById('zoomSlider');
+
+        // Sidebar Layers list
+        const pathLayersList = document.getElementById('pathLayersList');
+        const btnNewPath = document.getElementById('btnNewPath');
+
+        // Inspector UI
+        const noPointSelectedAlert = document.getElementById('noPointSelectedAlert');
+        const pointInspectorGroup = document.getElementById('pointInspectorGroup');
+        const inspectorPtX = document.getElementById('inspectorPtX');
+        const inspectorPtY = document.getElementById('inspectorPtY');
+        const lblSelectedPointIndex = document.getElementById('lblSelectedPointIndex');
+        const btnDeleteSelectedPoint = document.getElementById('btnDeleteSelectedPoint');
+
+        // Interpolator Settings Panels
+        const interpolatorConfigPanel = document.getElementById('interpolatorConfigPanel');
+        const interpolateCountInput = document.getElementById('interpolateCount');
+        const lblInterpolateCount = document.getElementById('lblInterpolateCount');
+        const btnConfirmInterpolate = document.getElementById('btnConfirmInterpolate');
+        const btnCancelInterpolate = document.getElementById('btnCancelInterpolate');
+        const btnInterpLinear = document.getElementById('btnInterpLinear');
+        const btnInterpCurved = document.getElementById('btnInterpCurved');
+
+        // Export Toggles
+        const chkExportBoundary = document.getElementById('chkExportBoundary');
+        const chkExportLines = document.getElementById('chkExportLines');
+        const chkExportHoles = document.getElementById('chkExportHoles');
+
+        // Stats Footer Elements
+        const statHolesCount = document.getElementById('statHolesCount');
+        const statPathLen = document.getElementById('statPathLen');
+        const statThreadEstimate = document.getElementById('statThreadEstimate');
+
+        // App System States (Internal Storage is kept in raw Metric millimeters)
+        let cardWidthMm = 127.0;  
+        let cardHeightMm = 177.8;
+        let pxPerMm = 4;        
+        let holeDiameter = 1.2;
+        let showGrid = true;
+        let snapToGrid = true;
+        let gridSpacing = 5.0;
+
+        // Interactive Units System Support
+        let currentUnit = 'mm'; // 'mm' or 'in'
+        const MM_TO_INCH = 1 / 25.4;
+        const INCH_TO_MM = 25.4;
+
+        // Viewport transformations for Pan/Zoom
+        let zoom = 1.8;
+        let panOffset = { x: 80, y: 50 };
+        let isPanning = false;
+        let startPan = { x: 0, y: 0 };
+        let activeTool = 'draw'; 
+
+        // Paths and Nodes structure
+        let paths = [
+            {
+                id: 'path-' + Date.now(),
+                name: 'Standard Outline',
+                points: [],
+                closed: false,
+                visible: true,
+                color: '#4f46e5' // Indigo
+            }
+        ];
+        let activePathIndex = 0;
+        let selectedPoint = null; 
+        let draggedPtInfo = null; 
+
+        // Line Interpolator temporary reference points
+        let interpPointA = null; 
+        let interpPointB = null; 
+        let isDrawingInterp = false;
+        let interpType = 'linear'; 
+
+        // Backdrop properties
+        let img = new Image();
+        let bgProperties = {
+            scale: 1.0,
+            rotate: 0, // degrees
+            x: 0,      // in mm from workspace center
+            y: 0,      // in mm from workspace center
+            opacity: 0.5,
+            brightness: 100,
+            contrast: 100
+        };
+
+        // Standard Dimension Presets map
+        const presets = {
+            'A7': { w: 127, h: 177.8 },
+            'A2': { w: 108, h: 139.7 },
+            'A6': { w: 105, h: 148 },
+            'Square': { w: 127, h: 127 },
+            'Letter': { w: 215.9, h: 279.4 },
+            'A4': { w: 210, h: 297 }
+        };
+
+        // Conversion helper utilities
+        function toDisplay(mmValue) {
+            return currentUnit === 'in' ? mmValue * MM_TO_INCH : mmValue;
+        }
+
+        function toMm(displayValue) {
+            return currentUnit === 'in' ? displayValue * INCH_TO_MM : displayValue;
+        }
+
+        function unitStr() {
+            return currentUnit === 'in' ? 'in' : 'mm';
+        }
+
+        // Initialize App & Bounds Setup
+        function init() {
+            setPresetBounds();
+            resizeCanvas();
+            repositionToCenter();
+            renderLayersUI();
+            updateUnitUI();
+            showToast("Pattern Blueprint Studio Loaded!", "#4f46e5");
+        }
+
+        function setPresetBounds() {
+            const val = cardPreset.value;
+            if (val === 'Custom') {
+                customSizeRow.classList.remove('hidden');
+                cardWidthMm = toMm(parseFloat(cardWidthInput.value) || 127.0);
+                cardHeightMm = toMm(parseFloat(cardHeightInput.value) || 177.8);
+            } else {
+                customSizeRow.classList.add('hidden');
+                cardWidthMm = presets[val].w;
+                cardHeightMm = presets[val].h;
+                cardWidthInput.value = toDisplay(cardWidthMm).toFixed(currentUnit === 'in' ? 2 : 1);
+                cardHeightInput.value = toDisplay(cardHeightMm).toFixed(currentUnit === 'in' ? 2 : 1);
+            }
+        }
+
+        // Adjust Virtual Resolution of the Drawing Viewport relative to its screen wrapper container
+        function resizeCanvas() {
+            const containerW = viewportContainer.clientWidth;
+            const containerH = viewportContainer.clientHeight;
+            
+            // Allocate 100% size within parent bounding box
+            canvas.width = containerW;
+            canvas.height = containerH;
+
+            // Set drawing density multiplier
+            pxPerMm = Math.min(containerW / cardWidthMm, containerH / cardHeightMm) * 0.85;
+            
+            draw();
+        }
+
+        // Quick centering calculations
+        function repositionToCenter() {
+            const containerW = viewportContainer.clientWidth;
+            const containerH = viewportContainer.clientHeight;
+
+            // Offset to place card center directly inside parent center view
+            const centerCardX = cardWidthMm * pxPerMm * zoom;
+            const centerCardY = cardHeightMm * pxPerMm * zoom;
+            
+            panOffset.x = (containerW - centerCardX) / 2;
+            panOffset.y = (containerH - centerCardY) / 2;
+
+            draw();
+            updateToolbarDisplays();
+        }
+
+        // --- DRAWING PIPELINE ---
+        function draw() {
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Apply Pan & Zoom Viewport translation Matrix
+            ctx.translate(panOffset.x, panOffset.y);
+            ctx.scale(pxPerMm * zoom, pxPerMm * zoom);
+
+            // 1. Render Background Photo Backdrop
+            if (img.src) {
+                ctx.save();
+                ctx.globalAlpha = bgProperties.opacity;
+                ctx.filter = `brightness(${bgProperties.brightness}%) contrast(${bgProperties.contrast}%)`;
+
+                // Translate relative to center of the workspace boundary
+                ctx.translate(cardWidthMm / 2 + bgProperties.x, cardHeightMm / 2 + bgProperties.y);
+                ctx.rotate(bgProperties.rotate * Math.PI / 180);
+
+                // Make initial display proportionate (e.g., scale to match blueprint)
+                const fitScale = cardWidthMm / img.width;
+                const drawW = img.width * fitScale * bgProperties.scale;
+                const drawH = img.height * fitScale * bgProperties.scale;
+
+                ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+                ctx.restore();
+            }
+
+            // 2. Render Alignment Grid Lines
+            if (showGrid) {
+                ctx.strokeStyle = '#e2e8f0';
+                ctx.lineWidth = 0.08 / zoom; // Thinner lines at higher zoom
+
+                // Major markers grid overlay in active units mapped back to mm grid coordinates
+                const spacingToUse = gridSpacing;
+                for (let x = 0; x <= cardWidthMm; x += spacingToUse) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, cardHeightMm);
+                    ctx.stroke();
+                }
+
+                for (let y = 0; y <= cardHeightMm; y += spacingToUse) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(cardWidthMm, y);
+                    ctx.stroke();
+                }
+            }
+
+            // 3. Draw Workspace Boundaries Boundary Border Frame
+            ctx.strokeStyle = '#6366f1'; // Indigo outline
+            ctx.lineWidth = 0.6 / zoom;
+            ctx.strokeRect(0, 0, cardWidthMm, cardHeightMm);
+
+            // Draw a second visual dark drop shadow edge for physical appearance
+            ctx.strokeStyle = 'rgba(15, 23, 42, 0.15)';
+            ctx.lineWidth = 0.2 / zoom;
+            ctx.strokeRect(-0.2, -0.2, cardWidthMm + 0.4, cardHeightMm + 0.4);
+
+            // 4. Draw Stitch Paths layers
+            paths.forEach((path, pIdx) => {
+                if (!path.visible) return;
+                const isCurrentPath = (pIdx === activePathIndex);
+                const pts = path.points;
+                if (pts.length === 0) return;
+
+                // Path guides
+                ctx.beginPath();
+                ctx.moveTo(pts[0].x, pts[0].y);
+                for (let i = 1; i < pts.length; i++) {
+                    ctx.lineTo(pts[i].x, pts[i].y);
+                }
+                if (path.closed && pts.length > 2) {
+                    ctx.closePath();
+                }
+
+                ctx.strokeStyle = isCurrentPath ? path.color : hexToRgba(path.color, 0.4);
+                ctx.lineWidth = isCurrentPath ? 0.4 : 0.2;
+                ctx.setLineDash(path.closed ? [] : [1.5, 1.5]); // dashed guide lines
+                ctx.stroke();
+                ctx.setLineDash([]); // Reset line dashes
+
+                // Path points (holes)
+                const radius = holeDiameter / 2;
+                pts.forEach((pt, nodeIdx) => {
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, radius, 0, 2 * Math.PI);
+                    
+                    let fillStyle = path.color;
+                    let isSelected = selectedPoint && selectedPoint.pathIdx === pIdx && selectedPoint.ptIdx === nodeIdx;
+
+                    if (isCurrentPath) {
+                        if (isSelected) {
+                            fillStyle = '#ff007f'; // Special hot pink highlight
+                        } else if (nodeIdx === 0) {
+                            fillStyle = '#10B981'; // Green starting node
+                        } else if (nodeIdx === pts.length - 1 && !path.closed) {
+                            fillStyle = '#F59E0B'; // Orange current lead tip
+                        }
+                    } else {
+                        fillStyle = hexToRgba(path.color, 0.5);
+                    }
+
+                    ctx.fillStyle = fillStyle;
+                    ctx.fill();
+
+                    // Node perimeter outline ring
+                    ctx.strokeStyle = isSelected ? '#ffffff' : 'rgba(255, 255, 255, 0.8)';
+                    ctx.lineWidth = isSelected ? 0.35 : 0.15;
+                    ctx.stroke();
+
+                    // Draw identification sequence indicators
+                    if (isCurrentPath) {
+                        const labelSize = Math.max(1.0, 2.5 / zoom);
+                        ctx.fillStyle = '#1e293b';
+                        ctx.font = `600 ${labelSize}mm sans-serif`;
+                        ctx.fillText(nodeIdx + 1, pt.x + radius + 0.3, pt.y + radius / 2);
+                    }
+                });
+            });
+
+            // 5. Draw Interpolator Line Previews
+            if (activeTool === 'interpolate') {
+                if (interpPointA) {
+                    ctx.beginPath();
+                    ctx.arc(interpPointA.x, interpPointA.y, 1.5, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#10B981'; // Green dot A
+                    ctx.fill();
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 0.3;
+                    ctx.stroke();
+                }
+
+                if (interpPointB) {
+                    ctx.beginPath();
+                    ctx.arc(interpPointB.x, interpPointB.y, 1.5, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#EF4444'; // Red dot B
+                    ctx.fill();
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 0.3;
+                    ctx.stroke();
+                }
+
+                // Temporary dashed interpolation line guide
+                if (interpPointA && interpPointB) {
+                    ctx.beginPath();
+                    ctx.moveTo(interpPointA.x, interpPointA.y);
+                    
+                    const count = parseInt(interpolateCountInput.value) || 8;
+                    const pointsArray = computeInterpolationPoints(interpPointA, interpPointB, count);
+                    
+                    if (interpType === 'linear') {
+                        ctx.lineTo(interpPointB.x, interpPointB.y);
+                    } else {
+                        // Curved visualization line
+                        for (let i = 1; i < pointsArray.length; i++) {
+                            ctx.lineTo(pointsArray[i].x, pointsArray[i].y);
+                        }
+                    }
+
+                    ctx.strokeStyle = 'rgba(99, 102, 241, 0.8)';
+                    ctx.lineWidth = 0.3;
+                    ctx.setLineDash([1, 1]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Draw preview dots along the path
+                    const previewRadius = holeDiameter / 2;
+                    pointsArray.forEach((pt) => {
+                        ctx.beginPath();
+                        ctx.arc(pt.x, pt.y, previewRadius, 0, 2 * Math.PI);
+                        ctx.fillStyle = 'rgba(99, 102, 241, 0.6)';
+                        ctx.fill();
+                        ctx.strokeStyle = 'white';
+                        ctx.lineWidth = 0.1;
+                        ctx.stroke();
+                    });
+                }
+            }
+        }
+
+        // Convert page screen coordinates into virtual drawing millimeters
+        function screenToMm(screenX, screenY) {
+            const rect = canvas.getBoundingClientRect();
+            const canvasRelativeX = screenX - rect.left;
+            const canvasRelativeY = screenY - rect.top;
+
+            const mmX = (canvasRelativeX - panOffset.x) / (pxPerMm * zoom);
+            const mmY = (canvasRelativeY - panOffset.y) / (pxPerMm * zoom);
+            return { x: mmX, y: mmY };
+        }
+
+        // Apply grid alignment checks
+        function snap(pt) {
+            if (!snapToGrid) return pt;
+            // Snaps coordinate grid based on stored millimeter sizes
+            const snapX = Math.round(pt.x / gridSpacing) * gridSpacing;
+            const snapY = Math.round(pt.y / gridSpacing) * gridSpacing;
+            return { x: snapX, y: snapY };
+        }
+
+        // Quick conversion helper for non-blocking alpha color profiles
+        function hexToRgba(hex, alpha) {
+            const match = hex.replace('#', '').match(/.{1,2}/g);
+            if (!match) return hex;
+            const [r, g, b] = match.map(x => parseInt(x, 16));
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        // Trigger notifications inside workspace interface (replacing alert checks)
+        function showToast(message, color = "#4f46e5") {
+            const toast = document.getElementById('toastNotification');
+            const toastText = document.getElementById('toastText');
+            const colorIndicator = document.getElementById('toastColorIndicator');
+
+            toastText.textContent = message;
+            colorIndicator.style.backgroundColor = color;
+            
+            toast.classList.remove('translate-y-[-100px]', 'opacity-0', 'pointer-events-none');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            // Hide after timeout completes
+            setTimeout(() => {
+                toast.classList.add('translate-y-[-100px]', 'opacity-0', 'pointer-events-none');
+                toast.classList.remove('translate-y-0', 'opacity-100');
+            }, 3000);
+        }
+
+        // --- INTERACTION PATTERNS ---
+        
+        // Handles Unified Click Down Inputs (Mouse and Tablet Stylus Touches)
+        function handlePointerDown(clientX, clientY, isRightClick = false) {
+            if (isRightClick) {
+                // Pan activation on right mouse click
+                isPanning = true;
+                startPan = { x: clientX - panOffset.x, y: clientY - panOffset.y };
+                return;
+            }
+
+            const mmCoords = screenToMm(clientX, clientY);
+            const path = paths[activePathIndex];
+
+            if (activeTool === 'draw') {
+                if (!path) return;
+                const point = snap(mmCoords);
+
+                // Prevent placement outside card boundaries
+                if (point.x < 0 || point.x > cardWidthMm || point.y < 0 || point.y > cardHeightMm) {
+                    showToast("Stitch placed outside card bounds!", "#ef4444");
+                }
+
+                // Snap/Closure loop mechanism
+                if (path.points.length > 2 && !path.closed) {
+                    const snapDist = 4.0 / zoom; // Scalable snapping threshold based on visual zoom
+                    const distToStart = Math.hypot(path.points[0].x - point.x, path.points[0].y - point.y);
+                    if (distToStart < snapDist) {
+                        path.closed = true;
+                        showToast("Path Closed Loop Successfully!", "#10b981");
+                        draw();
+                        updateStats();
+                        return;
+                    }
+                }
+
+                path.points.push(point);
+                draw();
+                updateStats();
+            }
+            
+            else if (activeTool === 'edit') {
+                // Find nearest hole within snapping distance
+                let foundNode = null;
+                const selectThresholdMm = 3.5 / zoom;
+
+                for (let pIdx = 0; pIdx < paths.length; pIdx++) {
+                    const p = paths[pIdx];
+                    for (let i = 0; i < p.points.length; i++) {
+                        const pt = p.points[i];
+                        const dist = Math.hypot(pt.x - mmCoords.x, pt.y - mmCoords.y);
+                        if (dist < selectThresholdMm) {
+                            foundNode = { pathIdx: pIdx, ptIdx: i };
+                            break;
+                        }
+                    }
+                    if (foundNode) break;
+                }
+
+                if (foundNode) {
+                    draggedPtInfo = foundNode;
+                    selectedPoint = foundNode;
+                    setupInspector();
+                    draw();
+                } else {
+                    // Clicking empty space deselects point
+                    selectedPoint = null;
+                    setupInspector();
+                    draw();
+                    
+                    // Fallback to pan workspace
+                    isPanning = true;
+                    startPan = { x: clientX - panOffset.x, y: clientY - panOffset.y };
+                }
+            }
+
+            else if (activeTool === 'interpolate') {
+                const point = snap(mmCoords);
+                if (!interpPointA) {
+                    interpPointA = point;
+                    showToast("Point A registered. Select End Point B.", "#6366f1");
+                } else if (!interpPointB) {
+                    interpPointB = point;
+                    showToast("Line bounds ready. Apply to finalize.", "#10b981");
+                } else {
+                    // Third click resets pathing
+                    interpPointA = point;
+                    interpPointB = null;
+                }
+                draw();
+            }
+        }
+
+        // Pointer Movements Adjustments
+        function handlePointerMove(clientX, clientY) {
+            const mmCoords = screenToMm(clientX, clientY);
+            const dispX = toDisplay(mmCoords.x);
+            const dispY = toDisplay(mmCoords.y);
+            lblCursorCoords.textContent = `${dispX.toFixed(currentUnit === 'in' ? 2 : 1)}, ${dispY.toFixed(currentUnit === 'in' ? 2 : 1)} ${unitStr()}`;
+
+            if (isPanning) {
+                panOffset.x = clientX - startPan.x;
+                panOffset.y = clientY - startPan.y;
+                draw();
+                updateToolbarDisplays();
+            } 
+            else if (activeTool === 'edit' && draggedPtInfo) {
+                const currentPath = paths[draggedPtInfo.pathIdx];
+                const activePt = snap(mmCoords);
+                
+                // Keep points constrained during drag
+                activePt.x = Math.max(0, Math.min(cardWidthMm, activePt.x));
+                activePt.y = Math.max(0, Math.min(cardHeightMm, activePt.y));
+
+                // If path loop is closed, and we're dragging the start/end point, lock loop references
+                if (currentPath.closed && (draggedPtInfo.ptIdx === 0 || draggedPtInfo.ptIdx === currentPath.points.length - 1)) {
+                    currentPath.points[0] = activePt;
+                    currentPath.points[currentPath.points.length - 1] = activePt;
+                } else {
+                    currentPath.points[draggedPtInfo.ptIdx] = activePt;
+                }
+                
+                setupInspector();
+                draw();
+            }
+        }
+
+        function handlePointerUp() {
+            if (draggedPtInfo) {
+                draggedPtInfo = null;
+                updateStats();
+            }
+            isPanning = false;
+        }
+
+        // Compute alignment positions along vectors
+        function computeInterpolationPoints(ptA, ptB, totalCount) {
+            const out = [];
+            const segments = totalCount - 1;
+
+            if (interpType === 'linear') {
+                for (let i = 0; i <= segments; i++) {
+                    const ratio = i / segments;
+                    out.push({
+                        x: ptA.x + (ptB.x - ptA.x) * ratio,
+                        y: ptA.y + (ptB.y - ptA.y) * ratio
+                    });
+                }
+            } else {
+                // Curved/parabolic alignment wave preset
+                const midX = (ptA.x + ptB.x) / 2;
+                const midY = (ptA.y + ptB.y) / 2;
+                
+                // Add vertical bow depth perpendicular to baseline direction
+                const dx = ptB.x - ptA.x;
+                const dy = ptB.y - ptA.y;
+                const length = Math.hypot(dx, dy);
+                const perpX = -dy / length;
+                const perpY = dx / length;
+
+                const curveDepth = length * 0.15; // 15% perpendicular displacement
+
+                for (let i = 0; i <= segments; i++) {
+                    const ratio = i / segments;
+                    // Linear base point
+                    const lx = ptA.x + dx * ratio;
+                    const ly = ptA.y + dy * ratio;
+                    
+                    // Parabolic arc multiplier: h = 4 * ratio * (1 - ratio)
+                    const arcVal = 4 * ratio * (1 - ratio);
+                    
+                    out.push({
+                        x: lx + perpX * curveDepth * arcVal,
+                        y: ly + perpY * curveDepth * arcVal
+                    });
+                }
+            }
+            return out;
+        }
+
+        // Confirm straight stitch line values onto active path
+        function finalizeInterpolation() {
+            if (!interpPointA || !interpPointB) return;
+            const path = paths[activePathIndex];
+            if (!path) return;
+
+            const count = parseInt(interpolateCountInput.value) || 8;
+            const pointsToAdd = computeInterpolationPoints(interpPointA, interpPointB, count);
+
+            // Add generated points to active path
+            path.points = path.points.concat(pointsToAdd);
+
+            // Clear temporary markers
+            interpPointA = null;
+            interpPointB = null;
+
+            showToast(`Generated ${count} sequential stitches successfully!`, "#10b981");
+            draw();
+            updateStats();
+        }
+
+        // Setup mouse listeners on visual canvas
+        canvas.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            const isRight = (e.button === 2 || e.button === 1);
+            handlePointerDown(e.clientX, e.clientY, isRight);
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            handlePointerMove(e.clientX, e.clientY);
+        });
+
+        window.addEventListener('mouseup', handlePointerUp);
+
+        // Standard Mousewheel zoom setup
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomFactor = 1.1;
+            
+            // Acquire current mouse millimeter points
+            const mouseBeforeZoom = screenToMm(e.clientX, e.clientY);
+
+            if (e.deltaY < 0) {
+                zoom *= zoomFactor;
+            } else {
+                zoom /= zoomFactor;
+            }
+            zoom = Math.max(0.15, Math.min(10.0, zoom));
+
+            // Shift offset metrics center focus directly under pointer
+            const mouseAfterZoom = screenToMm(e.clientX, e.clientY);
+            panOffset.x += (mouseAfterZoom.x - mouseBeforeZoom.x) * pxPerMm * zoom;
+            panOffset.y += (mouseAfterZoom.y - mouseBeforeZoom.y) * pxPerMm * zoom;
+
+            updateToolbarDisplays();
+            draw();
+        });
+
+        // Touch device compatibility
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                handlePointerDown(touch.clientX, touch.clientY, false);
+            } else if (e.touches.length === 2) {
+                // Secondary pinch inputs trigger panning mechanics
+                isPanning = true;
+                const t1 = e.touches[0];
+                const t2 = e.touches[1];
+                const midX = (t1.clientX + t2.clientX) / 2;
+                const midY = (t1.clientY + t2.clientY) / 2;
+                startPan = { x: midX - panOffset.x, y: midY - panOffset.y };
+            }
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                handlePointerMove(touch.clientX, touch.clientY);
+            } else if (e.touches.length === 2 && isPanning) {
+                const t1 = e.touches[0];
+                const t2 = e.touches[1];
+                const midX = (t1.clientX + t2.clientX) / 2;
+                const midY = (t1.clientY + t2.clientY) / 2;
+                panOffset.x = midX - startPan.x;
+                panOffset.y = midY - startPan.y;
+                draw();
+            }
+        });
+
+        canvas.addEventListener('touchend', handlePointerUp);
+
+        // Prevent right-click context menus interrupting workspace actions
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+
+        // --- MANAGE LAYERS / PATH SYSTEM ---
+
+        function renderLayersUI() {
+            pathLayersList.innerHTML = '';
+            
+            paths.forEach((path, idx) => {
+                const isActive = (idx === activePathIndex);
+                
+                const item = document.createElement('div');
+                item.className = `p-3 rounded-lg border text-xs flex flex-col gap-2 transition ${
+                    isActive 
+                    ? 'bg-slate-800 border-indigo-500 shadow-md shadow-indigo-950/20 text-white' 
+                    : 'bg-slate-850 hover:bg-slate-800 border-slate-705 text-slate-300'
+                }`;
+
+                // Header path section
+                const header = document.createElement('div');
+                header.className = 'flex items-center justify-between gap-1';
+                
+                const titleBlock = document.createElement('div');
+                titleBlock.className = 'flex items-center gap-1.5 font-semibold cursor-pointer flex-1 truncate';
+                titleBlock.addEventListener('click', () => {
+                    activePathIndex = idx;
+                    selectedPoint = null;
+                    setupInspector();
+                    renderLayersUI();
+                    draw();
+                });
+
+                // Editable name input
+                const nameInput = document.createElement('input');
+                nameInput.type = 'text';
+                nameInput.value = path.name;
+                nameInput.className = 'bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-indigo-500 rounded px-1 w-28 text-xs font-bold text-slate-100';
+                nameInput.addEventListener('change', (e) => {
+                    path.name = e.target.value;
+                });
+                titleBlock.appendChild(nameInput);
+
+                // Quick stats count inline
+                const countBadge = document.createElement('span');
+                countBadge.className = 'text-[9px] bg-slate-900/40 text-slate-400 px-1.5 py-0.5 rounded-full';
+                countBadge.textContent = `${path.points.length} pts`;
+                titleBlock.appendChild(countBadge);
+
+                header.appendChild(titleBlock);
+
+                // Right actions inside layer card
+                const actions = document.createElement('div');
+                actions.className = 'flex items-center gap-1 shrink-0';
+
+                // Visible toggle
+                const btnVis = document.createElement('button');
+                btnVis.className = 'p-1 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition';
+                btnVis.innerHTML = path.visible 
+                    ? `<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>`
+                    : `<svg class="w-3.5 h-3.5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>`;
+                btnVis.addEventListener('click', () => {
+                    path.visible = !path.visible;
+                    renderLayersUI();
+                    draw();
+                });
+                actions.appendChild(btnVis);
+
+                // Color picker bubble
+                const colorInput = document.createElement('input');
+                colorInput.type = 'color';
+                colorInput.value = path.color;
+                colorInput.className = 'w-4 h-4 rounded cursor-pointer border border-slate-700 bg-transparent';
+                colorInput.addEventListener('input', (e) => {
+                    path.color = e.target.value;
+                    draw();
+                });
+                actions.appendChild(colorInput);
+
+                // Delete Path layer btn (Only allow if greater than 1 path layer)
+                if (paths.length > 1) {
+                    const btnDel = document.createElement('button');
+                    btnDel.className = 'p-1 hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 rounded transition';
+                    btnDel.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>`;
+                    btnDel.addEventListener('click', () => {
+                        paths.splice(idx, 1);
+                        // Safely re-route active selections
+                        if (activePathIndex >= paths.length) {
+                            activePathIndex = paths.length - 1;
+                        }
+                        selectedPoint = null;
+                        setupInspector();
+                        renderLayersUI();
+                        updateStats();
+                        draw();
+                    });
+                    actions.appendChild(btnDel);
+                }
+
+                header.appendChild(actions);
+                item.appendChild(header);
+
+                // Extended mini layer setting panel (Loop closure)
+                const settingsRow = document.createElement('div');
+                settingsRow.className = 'flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-800/60';
+                
+                const loopCheckLabel = document.createElement('label');
+                loopCheckLabel.className = 'flex items-center gap-1 cursor-pointer';
+                
+                const loopCheckInput = document.createElement('input');
+                loopCheckInput.type = 'checkbox';
+                loopCheckInput.checked = path.closed;
+                loopCheckInput.className = 'rounded border-slate-700 text-indigo-600 bg-slate-900 focus:ring-0';
+                loopCheckInput.addEventListener('change', (e) => {
+                    path.closed = e.target.checked;
+                    draw();
+                    updateStats();
+                });
+
+                loopCheckLabel.appendChild(loopCheckInput);
+                loopCheckLabel.appendChild(document.createTextNode('Closed Loop (Continuous)'));
+                settingsRow.appendChild(loopCheckLabel);
+
+                item.appendChild(settingsRow);
+                pathLayersList.appendChild(item);
+            });
+        }
+
+        // Add physical new layer path tracking
+        btnNewPath.addEventListener('click', () => {
+            const colors = ['#4f46e5', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#06B6D4'];
+            const nextColor = colors[paths.length % colors.length];
+
+            paths.push({
+                id: 'path-' + Date.now(),
+                name: `Path Pattern ${paths.length + 1}`,
+                points: [],
+                closed: false,
+                visible: true,
+                color: nextColor
+            });
+            activePathIndex = paths.length - 1;
+            selectedPoint = null;
+            setupInspector();
+            renderLayersUI();
+            draw();
+            showToast("Created new embroidery layer!", nextColor);
+        });
+
+
+        // --- MANAGE DIRECT PUNCH COORDINATES CONTROL ---
+
+        function setupInspector() {
+            if (!selectedPoint) {
+                noPointSelectedAlert.classList.remove('hidden');
+                pointInspectorGroup.classList.add('hidden');
+                return;
+            }
+
+            const currentPath = paths[selectedPoint.pathIdx];
+            const targetPoint = currentPath.points[selectedPoint.ptIdx];
+
+            if (!targetPoint) {
+                selectedPoint = null;
+                setupInspector();
+                return;
+            }
+
+            noPointSelectedAlert.classList.add('hidden');
+            pointInspectorGroup.classList.remove('hidden');
+
+            inspectorPtX.value = toDisplay(targetPoint.x).toFixed(currentUnit === 'in' ? 2 : 1);
+            inspectorPtY.value = toDisplay(targetPoint.y).toFixed(currentUnit === 'in' ? 2 : 1);
+            
+            // Sync labels based on selected units
+            document.getElementById('inspectorPtXLabel').textContent = `X coordinate (${unitStr()})`;
+            document.getElementById('inspectorPtYLabel').textContent = `Y coordinate (${unitStr()})`;
+
+            lblSelectedPointIndex.textContent = `Node Index: #${selectedPoint.ptIdx + 1} (${currentPath.name})`;
+        }
+
+        // Handle numeric input adjustments
+        inspectorPtX.addEventListener('change', (e) => {
+            if (!selectedPoint) return;
+            const path = paths[selectedPoint.pathIdx];
+            const val = toMm(parseFloat(e.target.value) || 0);
+            const clamped = Math.max(0, Math.min(cardWidthMm, val));
+            path.points[selectedPoint.ptIdx].x = clamped;
+            e.target.value = toDisplay(clamped).toFixed(currentUnit === 'in' ? 2 : 1);
+            draw();
+            updateStats();
+        });
+
+        inspectorPtY.addEventListener('change', (e) => {
+            if (!selectedPoint) return;
+            const path = paths[selectedPoint.pathIdx];
+            const val = toMm(parseFloat(e.target.value) || 0);
+            const clamped = Math.max(0, Math.min(cardHeightMm, val));
+            path.points[selectedPoint.ptIdx].y = clamped;
+            e.target.value = toDisplay(clamped).toFixed(currentUnit === 'in' ? 2 : 1);
+            draw();
+            updateStats();
+        });
+
+        // Delete Selected Node Hole directly
+        btnDeleteSelectedPoint.addEventListener('click', () => {
+            if (!selectedPoint) return;
+            const path = paths[selectedPoint.pathIdx];
+            
+            path.points.splice(selectedPoint.ptIdx, 1);
+
+            // If the loop was closed and we reduced nodes to under 3, break loop status
+            if (path.points.length < 3) {
+                path.closed = false;
+            }
+
+            selectedPoint = null;
+            setupInspector();
+            renderLayersUI();
+            updateStats();
+            draw();
+            showToast("Deleted targeted punch hole.", "#ef4444");
+        });
+
+
+        // --- TOOLBAR BEHAVIORS ---
+
+        canvasToolbar.addEventListener('click', (e) => {
+            const btn = e.target.closest('button');
+            if (!btn) return;
+
+            const tool = btn.getAttribute('data-tool');
+            if (!tool) return;
+
+            activeTool = tool;
+            
+            // Adjust active styles on tool buttons
+            document.querySelectorAll('#canvasToolbar button').forEach((b) => {
+                b.className = 'flex items-center gap-1.5 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-755 rounded-lg px-3.5 py-1.5 text-xs font-medium transition';
+            });
+            btn.className = 'flex items-center gap-1.5 bg-indigo-600 text-white border border-indigo-500 rounded-lg px-3.5 py-1.5 text-xs font-semibold shadow-md shadow-indigo-900/20 hover:bg-indigo-500 transition';
+
+            // Toggle specific submenus
+            if (activeTool === 'interpolate') {
+                interpolatorConfigPanel.classList.remove('hidden');
+                helperText.textContent = "Line Interpolator: Tap Canvas to place start Point A, then tap again to place Point B. Output evenly spaced holes.";
+            } else {
+                interpolatorConfigPanel.classList.add('hidden');
+                interpPointA = null;
+                interpPointB = null;
+
+                if (activeTool === 'edit') {
+                    helperText.textContent = "Adjust Mode: Click and drag any circle guide node to shift its position. Double click or use Inspector to delete.";
+                } else {
+                    helperText.textContent = "Draw Stitch: Tap anywhere along your template lines to punch sequential stitching marks. Snapping grid is active.";
+                }
+            }
+
+            selectedPoint = null;
+            setupInspector();
+            draw();
+        });
+
+
+        // --- BACKDROP CONTROL SETTINGS ---
+
+        imageLoader.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                img.onload = function() {
+                    // Activate alignment panels
+                    backdropControls.classList.remove('opacity-50', 'pointer-events-none');
+                    imageStatusBadge.textContent = "Photo Loaded";
+                    imageStatusBadge.className = "text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-900 px-2 py-0.5 rounded-full";
+                    
+                    // Reset properties to default scaling fitting
+                    bgProperties.scale = 1.0;
+                    bgProperties.rotate = 0;
+                    bgProperties.x = 0;
+                    bgProperties.y = 0;
+                    updateBackdropInputsUI();
+                    
+                    showToast("Photo backdrop loaded successfully!", "#10b981");
+                    draw();
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        function updateBackdropInputsUI() {
+            // Update dual range sliders
+            bgScaleInput.value = Math.round(bgProperties.scale * 100);
+            numBgScale.value = Math.round(bgProperties.scale * 100);
+
+            bgRotateInput.value = bgProperties.rotate;
+            numBgRotate.value = bgProperties.rotate;
+
+            bgOpacityInput.value = Math.round(bgProperties.opacity * 100);
+            numBgOpacity.value = Math.round(bgProperties.opacity * 100);
+
+            bgBrightnessInput.value = bgProperties.brightness;
+            numBgBrightness.value = bgProperties.brightness;
+
+            bgContrastInput.value = bgProperties.contrast;
+            numBgContrast.value = bgProperties.contrast;
+
+            // Compute slider units bounds depending on active unit
+            const dispX = toDisplay(bgProperties.x);
+            const dispY = toDisplay(bgProperties.y);
+
+            if (currentUnit === 'in') {
+                bgXInput.min = -6;
+                bgXInput.max = 6;
+                bgXInput.step = 0.05;
+                bgYInput.min = -6;
+                bgYInput.max = 6;
+                bgYInput.step = 0.05;
+            } else {
+                bgXInput.min = -150;
+                bgXInput.max = 150;
+                bgXInput.step = 0.5;
+                bgYInput.min = -150;
+                bgYInput.max = 150;
+                bgYInput.step = 0.5;
+            }
+
+            bgXInput.value = dispX;
+            numBgX.value = dispX.toFixed(currentUnit === 'in' ? 2 : 1);
+            lblBgXUnit.textContent = unitStr();
+
+            bgYInput.value = dispY;
+            numBgY.value = dispY.toFixed(currentUnit === 'in' ? 2 : 1);
+            lblBgYUnit.textContent = unitStr();
+        }
+
+        // --- BACKDROP SLIDER & NUMBER SYNC BINDINGS ---
+
+        // Helper for dual property updating
+        function updateBgScale(val) {
+            bgProperties.scale = parseFloat(val) / 100;
+            bgScaleInput.value = val;
+            numBgScale.value = val;
+            draw();
+        }
+        bgScaleInput.addEventListener('input', (e) => updateBgScale(e.target.value));
+        numBgScale.addEventListener('change', (e) => {
+            const val = Math.max(10, Math.min(400, parseFloat(e.target.value) || 100));
+            updateBgScale(val);
+        });
+
+        function updateBgRotate(val) {
+            bgProperties.rotate = parseInt(val);
+            bgRotateInput.value = val;
+            numBgRotate.value = val;
+            draw();
+        }
+        bgRotateInput.addEventListener('input', (e) => updateBgRotate(e.target.value));
+        numBgRotate.addEventListener('change', (e) => {
+            const val = Math.max(-180, Math.min(180, parseInt(e.target.value) || 0));
+            updateBgRotate(val);
+        });
+
+        // Offset X Bindings
+        function updateBgX(dispVal) {
+            bgProperties.x = toMm(parseFloat(dispVal));
+            bgXInput.value = dispVal;
+            numBgX.value = parseFloat(dispVal).toFixed(currentUnit === 'in' ? 2 : 1);
+            draw();
+        }
+        bgXInput.addEventListener('input', (e) => updateBgX(e.target.value));
+        numBgX.addEventListener('change', (e) => {
+            const maxLim = currentUnit === 'in' ? 6 : 150;
+            const val = Math.max(-maxLim, Math.min(maxLim, parseFloat(e.target.value) || 0));
+            updateBgX(val);
+        });
+
+        // Offset Y Bindings
+        function updateBgY(dispVal) {
+            bgProperties.y = toMm(parseFloat(dispVal));
+            bgYInput.value = dispVal;
+            numBgY.value = parseFloat(dispVal).toFixed(currentUnit === 'in' ? 2 : 1);
+            draw();
+        }
+        bgYInput.addEventListener('input', (e) => updateBgY(e.target.value));
+        numBgY.addEventListener('change', (e) => {
+            const maxLim = currentUnit === 'in' ? 6 : 150;
+            const val = Math.max(-maxLim, Math.min(maxLim, parseFloat(e.target.value) || 0));
+            updateBgY(val);
+        });
+
+        // Opacity Bindings
+        function updateBgOpacity(val) {
+            bgProperties.opacity = parseFloat(val) / 100;
+            bgOpacityInput.value = val;
+            numBgOpacity.value = val;
+            draw();
+        }
+        bgOpacityInput.addEventListener('input', (e) => updateBgOpacity(e.target.value));
+        numBgOpacity.addEventListener('change', (e) => {
+            const val = Math.max(5, Math.min(100, parseInt(e.target.value) || 50));
+            updateBgOpacity(val);
+        });
+
+        // Brightness Bindings
+        function updateBgBrightness(val) {
+            bgProperties.brightness = parseInt(val);
+            bgBrightnessInput.value = val;
+            numBgBrightness.value = val;
+            draw();
+        }
+        bgBrightnessInput.addEventListener('input', (e) => updateBgBrightness(e.target.value));
+        numBgBrightness.addEventListener('change', (e) => {
+            const val = Math.max(30, Math.min(250, parseInt(e.target.value) || 100));
+            updateBgBrightness(val);
+        });
+
+        // Contrast Bindings
+        function updateBgContrast(val) {
+            bgProperties.contrast = parseInt(val);
+            bgContrastInput.value = val;
+            numBgContrast.value = val;
+            draw();
+        }
+        bgContrastInput.addEventListener('input', (e) => updateBgContrast(e.target.value));
+        numBgContrast.addEventListener('change', (e) => {
+            const val = Math.max(30, Math.min(250, parseInt(e.target.value) || 100));
+            updateBgContrast(val);
+        });
+
+        // Scale fit width utility
+        btnFitWidth.addEventListener('click', () => {
+            if (!img.src) return;
+            bgProperties.scale = 1.0;
+            bgProperties.rotate = 0;
+            bgProperties.x = 0;
+            bgProperties.y = 0;
+            updateBackdropInputsUI();
+            draw();
+            showToast("Reset backdrop to fit width standards", "#6366f1");
+        });
+
+        btnCenterPhoto.addEventListener('click', () => {
+            if (!img.src) return;
+            bgProperties.x = 0;
+            bgProperties.y = 0;
+            updateBackdropInputsUI();
+            draw();
+            showToast("Centered backdrop image bounds", "#6366f1");
+        });
+
+
+        // --- LINE GENERATOR PANEL CONTROLS ---
+
+        interpolateCountInput.addEventListener('input', (e) => {
+            lblInterpolateCount.textContent = `${e.target.value} holes`;
+            draw();
+        });
+
+        btnInterpLinear.addEventListener('click', () => {
+            interpType = 'linear';
+            btnInterpLinear.className = 'text-[10px] bg-indigo-600 text-white font-medium py-1.5 rounded transition';
+            btnInterpCurved.className = 'text-[10px] bg-slate-800 hover:bg-slate-755 text-slate-400 py-1.5 rounded transition';
+            draw();
+        });
+
+        btnInterpCurved.addEventListener('click', () => {
+            interpType = 'curved';
+            btnInterpLinear.className = 'text-[10px] bg-slate-800 hover:bg-slate-755 text-slate-400 py-1.5 rounded transition';
+            btnInterpCurved.className = 'text-[10px] bg-indigo-600 text-white font-medium py-1.5 rounded transition';
+            draw();
+        });
+
+        btnConfirmInterpolate.addEventListener('click', () => {
+            finalizeInterpolation();
+        });
+
+        btnCancelInterpolate.addEventListener('click', () => {
+            interpPointA = null;
+            interpPointB = null;
+            draw();
+            showToast("Clear spacing paths markers.", "#64748b");
+        });
+
+
+        // --- SYSTEM STATS PIPELINE ---
+
+        function updateStats() {
+            let totalHoles = 0;
+            let totalPathLengthMm = 0;
+
+            paths.forEach((path) => {
+                if (!path.visible) return;
+                const pts = path.points;
+                totalHoles += pts.length;
+
+                if (pts.length < 2) return;
+                
+                // Sum distances between points
+                let pathLength = 0;
+                for (let i = 0; i < pts.length - 1; i++) {
+                    pathLength += Math.hypot(pts[i+1].x - pts[i].x, pts[i+1].y - pts[i].y);
+                }
+                if (path.closed) {
+                    pathLength += Math.hypot(pts[pts.length - 1].x - pts[0].x, pts[0].y - pts[0].y);
+                }
+                totalPathLengthMm += pathLength;
+            });
+
+            // Thread usage factor: Front visible path lengths + physical depth loops running back-to-front
+            // Plus standard waste.
+            const thicknessMm = 1.2; 
+            const estimatedThreadMm = (totalPathLengthMm + (totalHoles * thicknessMm)) * 2.0;
+
+            statHolesCount.textContent = totalHoles;
+
+            if (currentUnit === 'in') {
+                const pathLenIn = totalPathLengthMm * MM_TO_INCH;
+                const threadIn = estimatedThreadMm * MM_TO_INCH;
+                statPathLen.textContent = `${pathLenIn.toFixed(2)} in`;
+                statThreadEstimate.textContent = `~${Math.ceil(threadIn)} in`;
+            } else {
+                statPathLen.textContent = `${Math.round(totalPathLengthMm)} mm`;
+                const threadCm = Math.ceil(estimatedThreadMm / 10);
+                statThreadEstimate.textContent = `~${threadCm} cm`;
+            }
+
+            // Keep layer count stats synced
+            renderLayersUI();
+        }
+
+
+        // --- CARD / GRID CONFIG LISTENERS ---
+
+        cardPreset.addEventListener('change', () => {
+            setPresetBounds();
+            resizeCanvas();
+            repositionToCenter();
+        });
+
+        cardWidthInput.addEventListener('change', () => {
+            cardWidthMm = toMm(parseFloat(cardWidthInput.value) || 127.0);
+            resizeCanvas();
+            repositionToCenter();
+        });
+
+        cardHeightInput.addEventListener('change', () => {
+            cardHeightMm = toMm(parseFloat(cardHeightInput.value) || 177.8);
+            resizeCanvas();
+            repositionToCenter();
+        });
+
+        holeSizeInput.addEventListener('change', () => {
+            holeDiameter = toMm(parseFloat(holeSizeInput.value) || 1.2);
+            draw();
+            updateStats();
+        });
+
+        gridSpacingInput.addEventListener('change', () => {
+            gridSpacing = toMm(parseFloat(gridSpacingInput.value) || 5.0);
+            draw();
+        });
+
+        showGridCheck.addEventListener('change', () => {
+            showGrid = showGridCheck.checked;
+            draw();
+        });
+
+        snapGridCheck.addEventListener('change', () => {
+            snapToGrid = snapGridCheck.checked;
+        });
+
+
+        // --- UNITS SYSTEM SWITCH LOGIC ---
+
+        function updateInputLabels() {
+            const u = unitStr();
+            document.getElementById('lblWidthTitle').textContent = `Width (${u})`;
+            document.getElementById('lblHeightTitle').textContent = `Height (${u})`;
+            document.getElementById('lblHoleSizeTitle').textContent = `Hole Size (${u})`;
+            document.getElementById('lblGridSpacingTitle').textContent = `Grid Spacing (${u})`;
+        }
+
+        function updateUnitUI() {
+            updateInputLabels();
+
+            // Set input incremental steps based on unit standard
+            if (currentUnit === 'in') {
+                cardWidthInput.step = "0.05";
+                cardHeightInput.step = "0.05";
+                holeSizeInput.step = "0.005";
+                gridSpacingInput.step = "0.05";
+            } else {
+                cardWidthInput.step = "0.5";
+                cardHeightInput.step = "0.5";
+                holeSizeInput.step = "0.1";
+                gridSpacingInput.step = "0.5";
+            }
+
+            // Repopulate user input measurements with precise conversions
+            cardWidthInput.value = toDisplay(cardWidthMm).toFixed(currentUnit === 'in' ? 2 : 1);
+            cardHeightInput.value = toDisplay(cardHeightMm).toFixed(currentUnit === 'in' ? 2 : 1);
+            holeSizeInput.value = toDisplay(holeDiameter).toFixed(currentUnit === 'in' ? 3 : 1);
+            gridSpacingInput.value = toDisplay(gridSpacing).toFixed(currentUnit === 'in' ? 2 : 1);
+
+            updateBackdropInputsUI();
+            setupInspector();
+            updateStats();
+            draw();
+        }
+
+        unitMmBtn.addEventListener('click', () => {
+            if (currentUnit === 'mm') return;
+            currentUnit = 'mm';
+            unitMmBtn.className = 'px-2.5 py-1 text-xs font-semibold rounded-l-md bg-indigo-600 text-white border border-indigo-550 transition';
+            unitInBtn.className = 'px-2.5 py-1 text-xs font-semibold rounded-r-md bg-slate-800 text-slate-400 border border-slate-700 hover:text-white transition';
+            updateUnitUI();
+        });
+
+        unitInBtn.addEventListener('click', () => {
+            if (currentUnit === 'in') return;
+            currentUnit = 'in';
+            unitInBtn.className = 'px-2.5 py-1 text-xs font-semibold rounded-r-md bg-indigo-600 text-white border border-indigo-550 transition';
+            unitMmBtn.className = 'px-2.5 py-1 text-xs font-semibold rounded-l-md bg-slate-800 text-slate-400 border border-slate-700 hover:text-white transition';
+            updateUnitUI();
+        });
+
+
+        // --- VIEWPORT / ZOOM ACTIONS ---
+
+        function updateToolbarDisplays() {
+            lblZoomLevel.textContent = `${Math.round(zoom * 100)}%`;
+            zoomSlider.value = Math.round(zoom * 100);
+        }
+
+        zoomSlider.addEventListener('input', (e) => {
+            zoom = parseFloat(e.target.value) / 100;
+            updateToolbarDisplays();
+            draw();
+        });
+
+        btnZoomIn.addEventListener('click', () => {
+            zoom = Math.min(6.0, zoom + 0.2);
+            updateToolbarDisplays();
+            draw();
+        });
+
+        btnZoomOut.addEventListener('click', () => {
+            zoom = Math.max(0.2, zoom - 0.2);
+            updateToolbarDisplays();
+            draw();
+        });
+
+        btnResetView.addEventListener('click', () => {
+            zoom = 1.8;
+            repositionToCenter();
+            updateToolbarDisplays();
+        });
+
+
+        // --- GENERAL TOOL ACTION SHORTCUTS (Undo, Clear) ---
+
+        function undoLastPoint() {
+            const path = paths[activePathIndex];
+            if (path && path.points.length > 0) {
+                // If path loop is closed, undoing simply breaks loop first
+                if (path.closed) {
+                    path.closed = false;
+                    showToast("Path loop unlocked.", "#f59e0b");
+                } else {
+                    path.points.pop();
+                }
+                draw();
+                updateStats();
+            }
+        }
+
+        undoBtn.addEventListener('click', undoLastPoint);
+
+        // Global key shortcut bindings (Ctrl+Z, Del)
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                undoLastPoint();
+            }
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (selectedPoint) {
+                    const path = paths[selectedPoint.pathIdx];
+                    path.points.splice(selectedPoint.ptIdx, 1);
+                    if (path.points.length < 3) {
+                        path.closed = false;
+                    }
+                    selectedPoint = null;
+                    setupInspector();
+                    renderLayersUI();
+                    updateStats();
+                    draw();
+                    showToast("Deleted targeted punch hole.", "#ef4444");
+                }
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            const path = paths[activePathIndex];
+            if (path) {
+                path.points = [];
+                path.closed = false;
+                selectedPoint = null;
+                setupInspector();
+                draw();
+                updateStats();
+                showToast("Cleared active pattern layer.", "#ef4444");
+            }
+        });
+
+
+        // --- FILE STORAGE IMPLEMENTATIONS ---
+
+        // Local storage saving setup
+        saveProjectBtn.addEventListener('click', () => {
+            const hasImage = img.src && img.src.startsWith('data:image');
+            const payload = {
+                version: "2.1",
+                cardWidthMm,
+                cardHeightMm,
+                holeDiameter,
+                gridSpacing,
+                paths,
+                bgProperties,
+                bgImageSrc: hasImage ? img.src : null // Full embedded original trace image!
+            };
+            
+            const stringified = JSON.stringify(payload, null, 2);
+            const blob = new Blob([stringified], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `stitching_project_${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showToast("Project blueprint package saved!", "#10b981");
+        });
+
+        // Loaded configurations parser
+        projectLoader.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    
+                    // Parse configurations back to state definitions safely
+                    cardWidthMm = data.cardWidthMm || 127;
+                    cardHeightMm = data.cardHeightMm || 177.8;
+                    holeDiameter = data.holeDiameter || 1.2;
+                    gridSpacing = data.gridSpacing || 5.0;
+                    paths = data.paths || [];
+                    bgProperties = data.bgProperties || bgProperties;
+
+                    // Restore backdrop trace image automatically if saved
+                    if (data.bgImageSrc) {
+                        img.onload = function() {
+                            backdropControls.classList.remove('opacity-50', 'pointer-events-none');
+                            imageStatusBadge.textContent = "Photo Loaded";
+                            imageStatusBadge.className = "text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-900 px-2 py-0.5 rounded-full";
+                            updateBackdropInputsUI();
+                            draw();
+                        };
+                        img.src = data.bgImageSrc;
+                    } else {
+                        img = new Image(); // reset
+                        imageStatusBadge.textContent = "No image";
+                        imageStatusBadge.className = "text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full";
+                        backdropControls.classList.add('opacity-50', 'pointer-events-none');
+                    }
+
+                    // Reset selected views
+                    activePathIndex = 0;
+                    selectedPoint = null;
+
+                    // Sync values with inputs
+                    cardPreset.value = "Custom";
+                    customSizeRow.classList.remove('hidden');
+
+                    updateUnitUI();
+                    resizeCanvas();
+                    repositionToCenter();
+                    
+                    showToast("Successfully loaded project setup!", "#10b981");
+                } catch (err) {
+                    showToast("Failed to parse valid project file JSON", "#ef4444");
+                }
+            };
+            reader.readAsText(file);
+        });
+
+
+        // --- PHYSICAL EXPORT VECTOR SVG ENGINE ---
+
+        function exportSVG() {
+            const hasPoints = paths.some(p => p.points.length > 0);
+            if (!hasPoints) {
+                showToast("Please trace some points before exporting!", "#ef4444");
+                return;
+            }
+
+            const targetWidthMm = cardWidthMm;
+            const targetHeightMm = cardHeightMm;
+            const radiusMm = holeDiameter / 2;
+
+            let svgContent = `<?xml version="1.0" encoding="utf-8"?>\n`;
+            svgContent += `<!-- Stitching Blueprint Generated by Stitching Pattern Blueprint Studio -->\n`;
+            svgContent += `<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="${targetWidthMm}mm" height="${targetHeightMm}mm" viewBox="0 0 ${targetWidthMm} ${targetHeightMm}">\n`;
+            
+            // 1. Export Outer Alignment Bounds Border (Laser cut / Alignment template)
+            if (chkExportBoundary.checked) {
+                svgContent += `  <!-- Card Frame Boundary (Cut Line) -->\n`;
+                svgContent += `  <rect x="0" y="0" width="${targetWidthMm}" height="${targetHeightMm}" fill="none" stroke="#0000FF" stroke-width="0.25" />\n`;
+            }
+
+            // 2. Export Dash Trails (Scoring reference paths)
+            if (chkExportLines.checked) {
+                svgContent += `  <!-- Dash Guide Lines Trails (Score / Pen Plotting) -->\n`;
+                paths.forEach((path, idx) => {
+                    if (!path.visible || path.points.length < 2) return;
+                    
+                    let d = `M ${path.points[0].x.toFixed(3)},${path.points[0].y.toFixed(3)} `;
+                    for (let i = 1; i < path.points.length; i++) {
+                        d += `L ${path.points[i].x.toFixed(3)},${path.points[i].y.toFixed(3)} `;
+                    }
+                    if (path.closed) {
+                        d += `Z`;
+                    }
+                    svgContent += `  <path d="${d}" fill="none" stroke="#000000" stroke-width="0.15" stroke-dasharray="1,1" />\n`;
+                });
+            }
+
+            // 3. Export Vector Hole Circles
+            if (chkExportHoles.checked) {
+                svgContent += `  <!-- Vector Cutting Holes (Physical Punch Guides) -->\n`;
+                paths.forEach((path) => {
+                    if (!path.visible || path.points.length === 0) return;
+                    
+                    path.points.forEach((pt) => {
+                        svgContent += `  <circle cx="${pt.x.toFixed(3)}" cy="${pt.y.toFixed(3)}" r="${radiusMm.toFixed(3)}" fill="none" stroke="#FF0000" stroke-width="0.1" />\n`;
+                    });
+                });
+            }
+
+            svgContent += `</svg>`;
+
+            // Create temporary virtual link download element
+            const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'grandma_card_stitch_stencil.svg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast("Downloaded SVG Blueprint!", "#10b981");
+        }
+
+        downloadBtn.addEventListener('click', exportSVG);
+
+        // Window load starter
+        window.addEventListener('load', init);
+        window.addEventListener('resize', resizeCanvas);
+    </script>
+</body>
+</html>
